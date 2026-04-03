@@ -29,15 +29,15 @@ func newDeleteCmd() *cobra.Command {
 			}
 
 			if !force {
-				fmt.Fprintf(cmd.OutOrStdout(), "This will delete profile %q:\n", name)
-				fmt.Fprintf(cmd.OutOrStdout(), "  Directory: %s\n", p.Dir)
-				fmt.Fprintf(cmd.OutOrStdout(), "  Keychain:  %s\n", p.ServiceKey)
-				fmt.Fprint(cmd.OutOrStdout(), "Are you sure? [y/N] ")
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "This will delete profile %q:\n", name)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Directory: %s\n", p.Dir)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Keychain:  %s\n", p.ServiceKey)
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), "Are you sure? [y/N] ")
 
 				reader := bufio.NewReader(os.Stdin)
 				input, _ := reader.ReadString('\n')
 				if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(input)), "y") {
-					fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
 					return nil
 				}
 			}
@@ -46,7 +46,7 @@ func newDeleteCmd() *cobra.Command {
 				return fmt.Errorf("deleting profile: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Profile %q deleted.\n", name)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Profile %q deleted.\n", name)
 			return nil
 		},
 	}

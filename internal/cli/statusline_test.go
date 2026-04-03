@@ -24,14 +24,14 @@ func TestStatuslineCmd_WithEnvVars(t *testing.T) {
 	// Provide empty stdin
 	oldStdin := os.Stdin
 	stdinR, stdinW, _ := os.Pipe()
-	stdinW.Close()
+	_ = stdinW.Close()
 	os.Stdin = stdinR
 
 	cmd := newStatuslineCmd()
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	os.Stdin = oldStdin
 
@@ -53,10 +53,10 @@ func TestStatuslineCmd_NoEnvVars(t *testing.T) {
 	t.Setenv("CLAUDE_PROFILE_COLOR", "")
 
 	// Unset the env vars
-	os.Unsetenv("CLAUDE_PROFILE_NAME")
-	os.Unsetenv("CLAUDE_PROFILE_AUTH")
-	os.Unsetenv("CLAUDE_PROFILE_SUB")
-	os.Unsetenv("CLAUDE_PROFILE_COLOR")
+	_ = os.Unsetenv("CLAUDE_PROFILE_NAME")
+	_ = os.Unsetenv("CLAUDE_PROFILE_AUTH")
+	_ = os.Unsetenv("CLAUDE_PROFILE_SUB")
+	_ = os.Unsetenv("CLAUDE_PROFILE_COLOR")
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -64,14 +64,14 @@ func TestStatuslineCmd_NoEnvVars(t *testing.T) {
 
 	oldStdin := os.Stdin
 	stdinR, stdinW, _ := os.Pipe()
-	stdinW.Close()
+	_ = stdinW.Close()
 	os.Stdin = stdinR
 
 	cmd := newStatuslineCmd()
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	os.Stdin = oldStdin
 
@@ -97,14 +97,14 @@ func TestStatuslineCmd_DefaultColor(t *testing.T) {
 
 	oldStdin := os.Stdin
 	stdinR, stdinW, _ := os.Pipe()
-	stdinW.Close()
+	_ = stdinW.Close()
 	os.Stdin = stdinR
 
 	cmd := newStatuslineCmd()
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	os.Stdin = oldStdin
 
@@ -131,14 +131,14 @@ func TestStatuslineCmd_InvalidColor(t *testing.T) {
 
 	oldStdin := os.Stdin
 	stdinR, stdinW, _ := os.Pipe()
-	stdinW.Close()
+	_ = stdinW.Close()
 	os.Stdin = stdinR
 
 	cmd := newStatuslineCmd()
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	os.Stdin = oldStdin
 
@@ -164,14 +164,14 @@ func TestStatuslineCmd_ColorOutOfRange(t *testing.T) {
 
 	oldStdin := os.Stdin
 	stdinR, stdinW, _ := os.Pipe()
-	stdinW.Close()
+	_ = stdinW.Close()
 	os.Stdin = stdinR
 
 	cmd := newStatuslineCmd()
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	os.Stdin = oldStdin
 
@@ -196,7 +196,7 @@ func TestStatuslineCmd_WithChainedCommand(t *testing.T) {
 
 	oldStdin := os.Stdin
 	stdinR, stdinW, _ := os.Pipe()
-	stdinW.Close()
+	_ = stdinW.Close()
 	os.Stdin = stdinR
 
 	cmd := newStatuslineCmd()
@@ -204,7 +204,7 @@ func TestStatuslineCmd_WithChainedCommand(t *testing.T) {
 	cmd.SetArgs([]string{"--", "echo", "chained"})
 	err := cmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	os.Stdin = oldStdin
 

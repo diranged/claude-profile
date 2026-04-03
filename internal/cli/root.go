@@ -81,8 +81,8 @@ Or manage profiles directly:
 		"profile name (or set CLAUDE_PROFILE env var)")
 
 	// Bind CLAUDE_PROFILE env var as fallback for --profile flag
-	viper.BindEnv("profile", "CLAUDE_PROFILE")
-	viper.BindPFlag("profile", root.PersistentFlags().Lookup("profile"))
+	_ = viper.BindEnv("profile", "CLAUDE_PROFILE")
+	_ = viper.BindPFlag("profile", root.PersistentFlags().Lookup("profile"))
 
 	root.AddCommand(
 		newCreateCmd(),

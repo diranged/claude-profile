@@ -23,7 +23,7 @@ func TestResolveProfile_FromEnvVar(t *testing.T) {
 	t.Setenv("CLAUDE_PROFILE", "envprofile")
 
 	// Re-bind the env var
-	viper.BindEnv("profile", "CLAUDE_PROFILE")
+	_ = viper.BindEnv("profile", "CLAUDE_PROFILE")
 
 	name, err := resolveProfile()
 	require.NoError(t, err)

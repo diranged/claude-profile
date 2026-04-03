@@ -52,7 +52,7 @@ func TestFindBinary_NotFound(t *testing.T) {
 func TestBuildEnv_AddsConfigDir(t *testing.T) {
 	// Clear CLAUDE_CONFIG_DIR from current env
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
-	os.Unsetenv("CLAUDE_CONFIG_DIR")
+	_ = os.Unsetenv("CLAUDE_CONFIG_DIR")
 
 	env := BuildEnv("/test/config/dir")
 

@@ -27,7 +27,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: fmt vet ## Run tests.
-	go test ./... -coverprofile cover.out -covermode=atomic
+	go test $$(go list ./... | grep -v /cmd) -coverprofile cover.out -covermode=atomic
 
 .PHONY: cover
 cover: ## Display test coverage report.
@@ -65,7 +65,7 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p "$(LOCALBIN)"
 
-GOLANGCI_LINT_VERSION ?= v2.5.0
+GOLANGCI_LINT_VERSION ?= v2.11.4
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 .PHONY: golangci-lint

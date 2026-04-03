@@ -27,20 +27,17 @@ func newShowCmd() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Profile:          %s\n", name)
-			fmt.Fprintf(out, "Config dir:       %s\n", p.ConfigDir)
-			fmt.Fprintf(out, "Keychain service: %s\n", p.ServiceKey)
-			fmt.Fprintf(out, "Auth:             %s\n", p.AuthStatus())
+			_, _ = fmt.Fprintf(out, "Profile:          %s\nConfig dir:       %s\nKeychain service: %s\nAuth:             %s\n",
+				name, p.ConfigDir, p.ServiceKey, p.AuthStatus())
 
 			if info, err := p.OAuthDetails(); err == nil {
-				fmt.Fprintf(out, "Subscription:     %s\n", info.SubscriptionType)
-				fmt.Fprintf(out, "Rate limit tier:  %s\n", info.RateLimitTier)
+				_, _ = fmt.Fprintf(out, "Subscription:     %s\nRate limit tier:  %s\n",
+					info.SubscriptionType, info.RateLimitTier)
 				if info.ExpiresAt > 0 {
-					t := time.UnixMilli(info.ExpiresAt)
-					fmt.Fprintf(out, "Expires:          %s\n", t.Format(time.RFC3339))
+					_, _ = fmt.Fprintf(out, "Expires:          %s\n", time.UnixMilli(info.ExpiresAt).Format(time.RFC3339))
 				}
 				if len(info.Scopes) > 0 {
-					fmt.Fprintf(out, "Scopes:           %s\n", strings.Join(info.Scopes, ", "))
+					_, _ = fmt.Fprintf(out, "Scopes:           %s\n", strings.Join(info.Scopes, ", "))
 				}
 			}
 

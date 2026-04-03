@@ -1,23 +1,30 @@
-name: Release Drafter
-
+name: release-drafter
 on:
+  workflow_dispatch: {}
   push:
     branches:
       - main
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  update_release_draft:
+  release-drafter:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
     steps:
-      - uses: release-drafter/release-drafter@v6
+      - name: Get Next Version
+        id: semver
+        uses: ietf-tools/semver-action@c90370b2958652d71c06a3484129a4d423a6d8a8 # v1
+        with:
+          token: ${{ github.token }}
+          branch: main
+          majorList: breaking
+          minorList: feat, feature
+          patchList: fix, bugfix, perf, refactor, test, tests, chore, doc
+      - name: Draft Release
+        uses: release-drafter/release-drafter@139054aeaa9adc52ab36ddf67437541f039b88e2 # v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          commitish: main
+          disable-autolabeler: true
+          version: ${{ steps.semver.outputs.next }}

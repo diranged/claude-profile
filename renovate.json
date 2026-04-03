@@ -2,17 +2,86 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    ":gomod",
-    "schedule:weekly"
+    ":dependencyDashboard",
+    ":semanticCommits"
   ],
+  "labels": ["dependencies"],
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore(deps):",
+  "separateMinorPatch": true,
+  "separateMajorMinor": true,
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 0,
+  "prCreation": "immediate",
+  "platformAutomerge": true,
+  "schedule": [
+    "before 10am on monday"
+  ],
+  "timezone": "America/Los_Angeles",
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch"],
+      "description": "Auto-merge all Go module patch updates",
+      "matchDatasources": ["go"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "Go module patch updates",
       "automerge": true
     },
     {
-      "matchManagers": ["gomod"],
-      "groupName": "Go module updates"
+      "description": "Auto-merge all Go module minor updates",
+      "matchDatasources": ["go"],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "Go module minor updates",
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge major Go module updates",
+      "matchDatasources": ["go"],
+      "matchUpdateTypes": ["major"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge all GitHub Actions patch updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "GitHub Actions patch updates",
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge all GitHub Actions minor updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "GitHub Actions minor updates",
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge major GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge GitHub Actions digest updates (pinned commit SHA updates)",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true
+    },
+    {
+      "description": "Pin GitHub Actions to exact commits for security",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
     }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "assignees": []
+  },
+  "osvVulnerabilityAlerts": true,
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "enabledManagers": [
+    "gomod",
+    "github-actions"
   ]
 }

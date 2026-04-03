@@ -21,14 +21,14 @@ func newListCmd() *cobra.Command {
 			}
 
 			if len(names) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No profiles found. Create one with: claude-profile login <name>")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No profiles found. Create one with: claude-profile login <name>")
 				return nil
 			}
 
 			for _, name := range names {
 				p := profile.Load(name)
 				auth := p.AuthStatus()
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-20s (%s)\n", name, auth)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %-20s (%s)\n", name, auth)
 			}
 			return nil
 		},

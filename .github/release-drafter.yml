@@ -1,95 +1,32 @@
-name-template: "v$RESOLVED_VERSION"
-tag-template: "v$RESOLVED_VERSION"
-
+name-template: v$RESOLVED_VERSION
+tag-template: 'v$RESOLVED_VERSION'
+tag-prefix: 'v'
 categories:
-  - title: "Breaking Changes"
+  - title: 'Features'
     labels:
-      - "breaking"
-      - "BREAKING CHANGE"
-  - title: "Features"
+      - 'feature'
+      - 'enhancement'
+      - 'feat'
+  - title: 'Bug Fixes'
     labels:
-      - "feature"
-      - "enhancement"
-    collapse-after: 10
-  - title: "Bug Fixes"
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+  - title: 'Maintenance'
     labels:
-      - "bugfix"
-      - "bug"
-    collapse-after: 10
-  - title: "Documentation"
+      - 'chore'
+      - 'refactor'
+  - title: 'Documentation'
     labels:
-      - "documentation"
-  - title: "Maintenance"
+      - 'docs'
+      - 'documentation'
+  - title: 'Tests'
     labels:
-      - "chore"
-      - "ci"
-      - "refactor"
-      - "test"
-      - "build"
-      - "dependencies"
-
-autolabeler:
-  - label: "feature"
-    title:
-      - "/^feat[:(]/i"
-  - label: "bug"
-    title:
-      - "/^fix[:(]/i"
-  - label: "documentation"
-    title:
-      - "/^docs[:(]/i"
-  - label: "chore"
-    title:
-      - "/^chore[:(]/i"
-  - label: "ci"
-    title:
-      - "/^ci[:(]/i"
-  - label: "refactor"
-    title:
-      - "/^refactor[:(]/i"
-  - label: "test"
-    title:
-      - "/^test[:(]/i"
-  - label: "build"
-    title:
-      - "/^build[:(]/i"
-  - label: "breaking"
-    title:
-      - "/!:/i"
-    body:
-      - "/BREAKING CHANGE/i"
-
-change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+      - 'test'
+      - 'tests'
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&'
-no-changes-template: "- No changes"
-
-version-resolver:
-  major:
-    labels:
-      - "breaking"
-      - "BREAKING CHANGE"
-  minor:
-    labels:
-      - "feature"
-      - "enhancement"
-  patch:
-    labels:
-      - "bug"
-      - "bugfix"
-      - "chore"
-      - "ci"
-      - "refactor"
-      - "test"
-      - "build"
-      - "documentation"
-      - "dependencies"
-  default: minor
-
 template: |
-  ## What's Changed
+  ## Changes
 
   $CHANGES
-
-  ## Contributors
-
-  $CONTRIBUTORS

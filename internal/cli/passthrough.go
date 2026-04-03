@@ -82,7 +82,7 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 // that belong to claude-profile, passing everything else through.
 func extractClaudeArgs() []string {
 	args := rawArgs()
-	var result []string
+	result := make([]string, 0, len(args))
 	skip := false
 	for i, arg := range args {
 		if skip {

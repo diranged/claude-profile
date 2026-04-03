@@ -78,7 +78,7 @@ func TestExtractClaudeArgs_NoArgs(t *testing.T) {
 
 	os.Args = []string{"claude-profile"}
 	result := extractClaudeArgs()
-	assert.Nil(t, result)
+	assert.Empty(t, result)
 }
 
 func TestExtractClaudeArgs_OnlyProfile(t *testing.T) {
@@ -87,7 +87,7 @@ func TestExtractClaudeArgs_OnlyProfile(t *testing.T) {
 
 	os.Args = []string{"claude-profile", "-p", "work"}
 	result := extractClaudeArgs()
-	assert.Nil(t, result)
+	assert.Empty(t, result)
 }
 
 func TestExtractClaudeArgs_ProfileWithDashAtEnd(t *testing.T) {
@@ -147,7 +147,7 @@ func TestPrintBanner_DoesNotPanic(t *testing.T) {
 
 	printBanner("testprofile", "/tmp/test/config", "keychain", "pro", 108)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
@@ -167,7 +167,7 @@ func TestPrintBanner_CustomColor(t *testing.T) {
 
 	printBanner("work", "/config", "file", "free", 204)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
@@ -187,7 +187,7 @@ func TestPrintBanner_LongConfigDir(t *testing.T) {
 	longDir := "/very/long/path/that/exceeds/typical/widths/for/config/directory/name/goes/here/and/keeps/going"
 	printBanner("work", longDir, "none", "unknown", 33)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer

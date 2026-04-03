@@ -62,8 +62,8 @@ Example:
 			}
 
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "\nCreating profile: %s\n", name)
-			fmt.Fprintf(out, "Config directory: %s\n\n", p.ConfigDir)
+			_, _ = fmt.Fprintf(out, "\nCreating profile: %s\n", name)
+			_, _ = fmt.Fprintf(out, "Config directory: %s\n\n", p.ConfigDir)
 
 			// Step 1: Bootstrap config files
 			if err := offerBootstrap(p); err != nil {
@@ -80,25 +80,34 @@ Example:
 
 			// Step 3: Configure statusline
 			if err := configureStatusline(p); err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to configure statusline: %s\n", err)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to configure statusline: %s\n", err)
 			}
 
 			// Print next steps
-			fmt.Fprintf(out, "\nProfile %q created!\n\n", name)
-			fmt.Fprintf(out, "To authenticate, run claude-profile with your profile and use Claude's\n")
-			fmt.Fprintf(out, "built-in auth commands:\n\n")
-			fmt.Fprintf(out, "  Claude subscription (OAuth):\n")
-			fmt.Fprintf(out, "    claude-profile -p %s\n", name)
-			fmt.Fprintf(out, "    Then use /login inside Claude\n\n")
-			fmt.Fprintf(out, "  Claude subscription (CLI):\n")
-			fmt.Fprintf(out, "    claude-profile -p %s auth login\n", name)
-			fmt.Fprintf(out, "    claude-profile -p %s auth login --sso\n\n", name)
-			fmt.Fprintf(out, "  API key:\n")
-			fmt.Fprintf(out, "    ANTHROPIC_API_KEY=sk-... claude-profile -p %s\n\n", name)
-			fmt.Fprintf(out, "  AWS Bedrock:\n")
-			fmt.Fprintf(out, "    CLAUDE_CODE_USE_BEDROCK=1 claude-profile -p %s\n\n", name)
-			fmt.Fprintf(out, "  Google Vertex:\n")
-			fmt.Fprintf(out, "    CLAUDE_CODE_USE_VERTEX=1 claude-profile -p %s\n\n", name)
+			_, _ = fmt.Fprintf(out, `
+Profile %q created!
+
+To authenticate, run claude-profile with your profile and use Claude's
+built-in auth commands:
+
+  Claude subscription (OAuth):
+    claude-profile -p %[1]s
+    Then use /login inside Claude
+
+  Claude subscription (CLI):
+    claude-profile -p %[1]s auth login
+    claude-profile -p %[1]s auth login --sso
+
+  API key:
+    ANTHROPIC_API_KEY=sk-... claude-profile -p %[1]s
+
+  AWS Bedrock:
+    CLAUDE_CODE_USE_BEDROCK=1 claude-profile -p %[1]s
+
+  Google Vertex:
+    CLAUDE_CODE_USE_VERTEX=1 claude-profile -p %[1]s
+
+`, name)
 
 			return nil
 		},
