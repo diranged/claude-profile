@@ -1,0 +1,26 @@
+// Package main is the entrypoint for claude-profile.
+//
+// claude-profile is a transparent wrapper around Claude Code that enables
+// multiple subscription profiles. Each profile gets its own isolated
+// CLAUDE_CONFIG_DIR and keychain entry, allowing concurrent sessions
+// across different Claude subscriptions (e.g., work and personal).
+//
+// Usage:
+//
+//	claude-profile -p work [claude args...]
+//	CLAUDE_PROFILE=work claude-profile [claude args...]
+//	claude-profile login work
+//	claude-profile list
+package main
+
+import (
+	"os"
+
+	"github.com/diranged/claude-profile-go/internal/cli"
+)
+
+func main() {
+	if err := cli.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
