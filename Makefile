@@ -55,9 +55,17 @@ build: fmt vet ## Build binary.
 install: build ## Install binary to GOPATH/bin.
 	cp bin/$(BINARY_NAME) $(GOBIN)/$(BINARY_NAME)
 
+.PHONY: vhs
+vhs: ## Install VHS (terminal recorder for demo).
+	go install github.com/charmbracelet/vhs@latest
+
+.PHONY: demo
+demo: build ## Generate demo GIF using VHS.
+	export CLAUDE_PROFILES_DIR=$$(mktemp -d /tmp/claude-demo.XXXXXX) && vhs demo.tape && rm -rf "$$CLAUDE_PROFILES_DIR"
+
 .PHONY: clean
 clean: ## Remove build artifacts.
-	rm -rf bin/ dist/ cover.out
+	rm -rf bin/ dist/ cover.out docs/demo.gif
 
 ##@ Dependencies
 

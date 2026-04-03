@@ -66,7 +66,7 @@ func TestNewRootCmd_ProfileFlag(t *testing.T) {
 
 	f := cmd.PersistentFlags().Lookup("profile")
 	require.NotNil(t, f)
-	assert.Equal(t, "p", f.Shorthand)
+	assert.Equal(t, "P", f.Shorthand)
 }
 
 func TestInitLogger_Default(t *testing.T) {

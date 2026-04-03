@@ -34,13 +34,13 @@ Service:   Claude Code-credentials-6061db4b
 The passthrough flow (the primary usage mode) follows this sequence:
 
 ```
-1. User runs:          claude-profile -p work --model opus
+1. User runs:          claude-profile -P work --model opus
 2. cobra parses:       profileFlag = "work", remaining args unknown to cobra
 3. resolveProfile():   Returns "work" from flag or CLAUDE_PROFILE env
 4. profile.Load():     Constructs Profile struct with paths and keychain key
 5. Profile.Exists():   Checks config directory exists on disk
 6. AuthStatus():       Checks keychain (via `security` CLI), then .credentials.json
-7. extractClaudeArgs():Strips -p/--profile from os.Args, keeps everything else
+7. extractClaudeArgs():Strips -P/--profile from os.Args, keeps everything else
 8. claude.FindBinary():Locates real claude binary via PATH then fallback paths
 9. claude.BuildEnv():  Copies os.Environ(), sets CLAUDE_CONFIG_DIR
 10. setEnv():          Adds CLAUDE_PROFILE_NAME/AUTH/SUB/COLOR to env
@@ -201,9 +201,9 @@ The `claude-profile.yaml` file lives in the profile root (not inside `config/`) 
 
 ### Flag Parsing Strategy
 
-cobra's `FParseErrWhitelist.UnknownFlags` is enabled so that flags intended for Claude (like `--model`, `-c`, `--dangerously-skip-permissions`) are not rejected. The `extractClaudeArgs()` function then manually strips only the `-p`/`--profile` flag from `os.Args` before passing the rest to Claude.
+cobra's `FParseErrWhitelist.UnknownFlags` is enabled so that flags intended for Claude (like `--model`, `-c`, `--dangerously-skip-permissions`) are not rejected. The `extractClaudeArgs()` function then manually strips only the `-P`/`--profile` flag from `os.Args` before passing the rest to Claude. Uppercase `-P` is used to avoid conflicting with Claude Code's own `-p` (prompt) flag.
 
-The function handles all flag forms: `-p value`, `--profile value`, `--profile=value`, and `-pvalue`.
+The function handles all flag forms: `-P value`, `--profile value`, `--profile=value`, and `-Pvalue`.
 
 ### Version Injection
 

@@ -22,7 +22,7 @@ func TestExtractClaudeArgs_DashP_Space(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"claude-profile", "-p", "work", "--model", "opus"}
+	os.Args = []string{"claude-profile", "-P", "work", "--model", "opus"}
 	result := extractClaudeArgs()
 	assert.Equal(t, []string{"--model", "opus"}, result)
 }
@@ -49,7 +49,7 @@ func TestExtractClaudeArgs_DashP_Joined(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"claude-profile", "-pwork", "--model", "opus"}
+	os.Args = []string{"claude-profile", "-Pwork", "--model", "opus"}
 	result := extractClaudeArgs()
 	assert.Equal(t, []string{"--model", "opus"}, result)
 }
@@ -58,7 +58,7 @@ func TestExtractClaudeArgs_ProfileAtEnd(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"claude-profile", "--model", "opus", "-p", "work"}
+	os.Args = []string{"claude-profile", "--model", "opus", "-P", "work"}
 	result := extractClaudeArgs()
 	assert.Equal(t, []string{"--model", "opus"}, result)
 }
@@ -67,7 +67,7 @@ func TestExtractClaudeArgs_MixedFlags(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"claude-profile", "-p", "work", "auth", "login", "--sso"}
+	os.Args = []string{"claude-profile", "-P", "work", "auth", "login", "--sso"}
 	result := extractClaudeArgs()
 	assert.Equal(t, []string{"auth", "login", "--sso"}, result)
 }
@@ -85,7 +85,7 @@ func TestExtractClaudeArgs_OnlyProfile(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"claude-profile", "-p", "work"}
+	os.Args = []string{"claude-profile", "-P", "work"}
 	result := extractClaudeArgs()
 	assert.Empty(t, result)
 }
@@ -94,8 +94,8 @@ func TestExtractClaudeArgs_ProfileWithDashAtEnd(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	// -p at the very end with no value following
-	os.Args = []string{"claude-profile", "list", "-p"}
+	// -P at the very end with no value following
+	os.Args = []string{"claude-profile", "list", "-P"}
 	result := extractClaudeArgs()
 	assert.Equal(t, []string{"list"}, result)
 }

@@ -62,8 +62,9 @@ Example:
 			}
 
 			out := cmd.OutOrStdout()
-			_, _ = fmt.Fprintf(out, "\nCreating profile: %s\n", name)
-			_, _ = fmt.Fprintf(out, "Config directory: %s\n\n", p.ConfigDir)
+			_, _ = fmt.Fprintf(out, "\n%s%s CREATE PROFILE%s\n\n", colorBold, colorGreen, colorReset)
+			_, _ = fmt.Fprintf(out, "  %sProfile:%s   %s\n", colorCyan, colorReset, name)
+			_, _ = fmt.Fprintf(out, "  %sConfig:%s    %s\n\n", colorCyan, colorReset, p.ConfigDir)
 
 			// Step 1: Bootstrap config files
 			if err := offerBootstrap(p); err != nil {
@@ -80,34 +81,25 @@ Example:
 
 			// Step 3: Configure statusline
 			if err := configureStatusline(p); err != nil {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to configure statusline: %s\n", err)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %s⚠ Warning:%s failed to configure statusline: %s\n", colorYellow, colorReset, err)
 			}
 
 			// Print next steps
-			_, _ = fmt.Fprintf(out, `
-Profile %q created!
-
-To authenticate, run claude-profile with your profile and use Claude's
-built-in auth commands:
-
-  Claude subscription (OAuth):
-    claude-profile -p %[1]s
-    Then use /login inside Claude
-
-  Claude subscription (CLI):
-    claude-profile -p %[1]s auth login
-    claude-profile -p %[1]s auth login --sso
-
-  API key:
-    ANTHROPIC_API_KEY=sk-... claude-profile -p %[1]s
-
-  AWS Bedrock:
-    CLAUDE_CODE_USE_BEDROCK=1 claude-profile -p %[1]s
-
-  Google Vertex:
-    CLAUDE_CODE_USE_VERTEX=1 claude-profile -p %[1]s
-
-`, name)
+			_, _ = fmt.Fprintf(out, "\n%s%s ✓ Profile %q created!%s\n", colorBold, colorGreen, name, colorReset)
+			_, _ = fmt.Fprintf(out, "\n%s%s NEXT STEPS%s\n\n", colorBold, colorGreen, colorReset)
+			_, _ = fmt.Fprintf(out, "  Authenticate using any method:\n\n")
+			_, _ = fmt.Fprintf(out, "  %sOAuth%s          %s$%s claude-profile -P %s           %s# then /login inside Claude%s\n",
+				colorBold, colorReset, colorYellow, colorReset, name, colorDim, colorReset)
+			_, _ = fmt.Fprintf(out, "  %sCLI auth%s       %s$%s claude-profile -P %s auth login\n",
+				colorBold, colorReset, colorYellow, colorReset, name)
+			_, _ = fmt.Fprintf(out, "  %sSSO%s            %s$%s claude-profile -P %s auth login --sso\n",
+				colorBold, colorReset, colorYellow, colorReset, name)
+			_, _ = fmt.Fprintf(out, "  %sAPI key%s        %s$%s %sANTHROPIC_API_KEY%s=sk-... claude-profile -P %s\n",
+				colorBold, colorReset, colorYellow, colorReset, colorYellow, colorReset, name)
+			_, _ = fmt.Fprintf(out, "  %sBedrock%s        %s$%s %sCLAUDE_CODE_USE_BEDROCK%s=1 claude-profile -P %s\n",
+				colorBold, colorReset, colorYellow, colorReset, colorYellow, colorReset, name)
+			_, _ = fmt.Fprintf(out, "  %sVertex%s         %s$%s %sCLAUDE_CODE_USE_VERTEX%s=1 claude-profile -P %s\n\n",
+				colorBold, colorReset, colorYellow, colorReset, colorYellow, colorReset, name)
 
 			return nil
 		},
@@ -118,14 +110,14 @@ built-in auth commands:
 // option, reads the user's choice from stdin, and returns the selected ANSI
 // 256-color code. Invalid or empty input defaults to the first preset (green, 108).
 func pickColor() int {
-	fmt.Println("Pick a color for this profile's banner and statusline:")
+	fmt.Printf("%s%s COLOR%s\n\n", colorBold, colorGreen, colorReset)
+	fmt.Print("  Pick a color for this profile's banner and statusline:\n\n")
 	for i, preset := range colorPresets {
-		color := fmt.Sprintf("\033[38;5;%dm", preset.code)
-		reset := "\033[0m"
-		fmt.Printf("  %s%d) %s (%d)%s\n", color, i+1, preset.name, preset.code, reset)
+		swatch := fmt.Sprintf("\033[38;5;%dm", preset.code)
+		fmt.Printf("    %s%d)%s %s● %s%s\n", colorCyan, i+1, colorReset, swatch, preset.name, colorReset)
 	}
-	fmt.Printf("  %d) Custom (enter ANSI 256-color code)\n", len(colorPresets)+1)
-	fmt.Printf("\nChoice [1]: ")
+	fmt.Printf("    %s%d)%s Custom (enter ANSI 256-color code)\n", colorCyan, len(colorPresets)+1, colorReset)
+	fmt.Printf("\n  Choice %s[1]%s: ", colorDim, colorReset)
 
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
@@ -148,7 +140,7 @@ func pickColor() int {
 
 	// Custom color
 	if choice == len(colorPresets)+1 {
-		fmt.Print("Enter ANSI 256-color code (0-255): ")
+		fmt.Printf("  Enter ANSI 256-color code (0-255): ")
 		input, _ = reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 		if code, err := strconv.Atoi(input); err == nil && code >= 0 && code <= 255 {
@@ -195,10 +187,10 @@ func configureStatusline(p *profile.Profile) error {
 	var statuslineCmd string
 	if origCmd != "" {
 		statuslineCmd = fmt.Sprintf("%s statusline -- %s", self, origCmd)
-		fmt.Printf("Wrapping existing statusline: %s\n", origCmd)
+		fmt.Printf("  %s✓%s Wrapping existing statusline: %s%s%s\n", colorGreen, colorReset, colorDim, origCmd, colorReset)
 	} else {
 		statuslineCmd = fmt.Sprintf("%s statusline", self)
-		fmt.Println("Configured profile statusline.")
+		fmt.Printf("  %s✓%s Configured profile statusline\n", colorGreen, colorReset)
 	}
 
 	settings["statusLine"] = map[string]interface{}{
@@ -223,11 +215,12 @@ func offerBootstrap(p *profile.Profile) error {
 		return nil
 	}
 
-	fmt.Printf("Found config files in %s:\n", profile.DefaultConfigDir())
+	fmt.Printf("%s%s CONFIG FILES%s\n\n", colorBold, colorGreen, colorReset)
+	fmt.Printf("  Found existing config in %s%s%s:\n\n", colorDim, profile.DefaultConfigDir(), colorReset)
 	for _, f := range files {
-		fmt.Printf("  - %s\n", f)
+		fmt.Printf("    %s•%s %s\n", colorCyan, colorReset, f)
 	}
-	fmt.Print("Copy these into the new profile? [Y/n] ")
+	fmt.Printf("\n  Copy these into the new profile? %s[Y/n]%s ", colorDim, colorReset)
 
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
@@ -237,9 +230,9 @@ func offerBootstrap(p *profile.Profile) error {
 		if err := p.CopyBootstrapFiles(files); err != nil {
 			return fmt.Errorf("copying config files: %w", err)
 		}
-		fmt.Printf("Copied %d file(s) into profile.\n", len(files))
+		fmt.Printf("  %s✓%s Copied %d file(s) into profile\n\n", colorGreen, colorReset, len(files))
 	} else {
-		fmt.Println("Skipped.")
+		fmt.Printf("  %s—%s Skipped\n\n", colorDim, colorReset)
 	}
 
 	return nil

@@ -20,6 +20,11 @@
   "timezone": "America/Los_Angeles",
   "packageRules": [
     {
+      "description": "Wait 14 days for Go dependencies to stabilize before creating PRs",
+      "matchDatasources": ["go"],
+      "minimumReleaseAge": "14 days"
+    },
+    {
       "description": "Auto-merge all Go module patch updates",
       "matchDatasources": ["go"],
       "matchUpdateTypes": ["patch"],
