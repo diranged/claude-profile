@@ -17,6 +17,7 @@ jobs:
         with:
           token: ${{ github.token }}
           branch: main
+          fallbackTag: v0.0.0
           majorList: breaking
           minorList: feat, feature
           patchList: fix, bugfix, perf, refactor, test, tests, chore, doc
