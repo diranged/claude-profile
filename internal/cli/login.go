@@ -2,84 +2,193 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
-	"github.com/diranged/claude-profile-go/internal/claude"
 	"github.com/diranged/claude-profile-go/internal/profile"
 	"github.com/spf13/cobra"
 )
 
-func newLoginCmd() *cobra.Command {
+// Color presets offered during the setup wizard.
+var colorPresets = []struct {
+	name string
+	code int
+}{
+	{"Green (default)", 108},
+	{"Blue", 33},
+	{"Orange", 208},
+	{"Pink", 204},
+	{"Cyan", 51},
+	{"Red", 196},
+	{"Purple", 141},
+	{"Yellow", 226},
+}
+
+func newCreateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "login <profile> [flags]",
-		Short: "Login and save credentials for a profile",
-		Long: `Runs 'claude auth login' with an isolated config directory for the
-given profile. After login, credentials are stored in the macOS keychain
-under a profile-specific service name.
+		Use:   "create <profile>",
+		Short: "Create a new profile and launch Claude to authenticate",
+		Long: `Creates a new isolated profile directory, walks through a setup wizard
+(color selection, config bootstrap), then launches Claude so you can
+authenticate however you prefer (OAuth, API key, Bedrock, etc.).
 
-If ~/.claude exists with configuration files (CLAUDE.md, settings.json, etc.),
-you'll be offered the option to copy them into the new profile.
-
-Any extra flags are passed through to 'claude auth login' (e.g., --sso, --console).`,
-		Args: cobra.MinimumNArgs(1),
+Example:
+  claude-profile create work
+  claude-profile create personal`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			extra := args[1:] // passthrough flags like --sso, --console
-
 			p := profile.Load(name)
-			isNew := !p.Exists()
+
+			if p.Exists() {
+				return fmt.Errorf("profile %q already exists", name)
+			}
 
 			if err := p.EnsureDir(); err != nil {
 				return fmt.Errorf("creating profile directory: %w", err)
 			}
 
-			// For new profiles, offer to bootstrap from default config
-			if isNew {
-				if err := offerBootstrap(p); err != nil {
-					return err
-				}
-			}
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "\nCreating profile: %s\n", name)
+			fmt.Fprintf(out, "Config directory: %s\n\n", p.ConfigDir)
 
-			claudeBin, err := claude.FindBinary()
-			if err != nil {
+			// Step 1: Bootstrap config files
+			if err := offerBootstrap(p); err != nil {
 				return err
 			}
 
-			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Logging in for profile: %s\n", name)
-			fmt.Fprintf(out, "Config directory:       %s\n", p.ConfigDir)
-			fmt.Fprintf(out, "Keychain service:       %s\n", p.ServiceKey)
-			fmt.Println()
-
-			loginArgs := append([]string{"auth", "login"}, extra...)
-			env := claude.BuildEnv(p.ConfigDir)
-
-			exitCode, err := claude.RunDirect(claudeBin, loginArgs, env)
-			if err != nil {
-				return fmt.Errorf("claude auth login failed: %w", err)
-			}
-			if exitCode != 0 {
-				return fmt.Errorf("claude auth login exited with code %d", exitCode)
+			// Step 2: Color selection
+			color := pickColor()
+			cfg := profile.DefaultConfig()
+			cfg.Color = color
+			if err := p.SaveConfig(cfg); err != nil {
+				return fmt.Errorf("saving profile config: %w", err)
 			}
 
-			fmt.Println()
-
-			auth := p.AuthStatus()
-			switch auth {
-			case "keychain":
-				fmt.Fprintf(out, "Profile %q credentials saved to keychain (service: %s)\n", name, p.ServiceKey)
-			case "file":
-				fmt.Fprintf(out, "Profile %q credentials saved to file\n", name)
-			default:
-				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not verify credentials were saved for profile %q\n", name)
+			// Step 3: Configure statusline
+			if err := configureStatusline(p); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to configure statusline: %s\n", err)
 			}
 
-			fmt.Fprintf(out, "\nUsage: claude-profile -p %s\n", name)
+			// Print next steps
+			fmt.Fprintf(out, "\nProfile %q created!\n\n", name)
+			fmt.Fprintf(out, "To authenticate, run claude-profile with your profile and use Claude's\n")
+			fmt.Fprintf(out, "built-in auth commands:\n\n")
+			fmt.Fprintf(out, "  Claude subscription (OAuth):\n")
+			fmt.Fprintf(out, "    claude-profile -p %s\n", name)
+			fmt.Fprintf(out, "    Then use /login inside Claude\n\n")
+			fmt.Fprintf(out, "  Claude subscription (CLI):\n")
+			fmt.Fprintf(out, "    claude-profile -p %s auth login\n", name)
+			fmt.Fprintf(out, "    claude-profile -p %s auth login --sso\n\n", name)
+			fmt.Fprintf(out, "  API key:\n")
+			fmt.Fprintf(out, "    ANTHROPIC_API_KEY=sk-... claude-profile -p %s\n\n", name)
+			fmt.Fprintf(out, "  AWS Bedrock:\n")
+			fmt.Fprintf(out, "    CLAUDE_CODE_USE_BEDROCK=1 claude-profile -p %s\n\n", name)
+			fmt.Fprintf(out, "  Google Vertex:\n")
+			fmt.Fprintf(out, "    CLAUDE_CODE_USE_VERTEX=1 claude-profile -p %s\n\n", name)
+
 			return nil
 		},
 	}
+}
+
+// pickColor presents color presets and returns the selected ANSI 256-color code.
+func pickColor() int {
+	fmt.Println("Pick a color for this profile's banner and statusline:")
+	for i, preset := range colorPresets {
+		color := fmt.Sprintf("\033[38;5;%dm", preset.code)
+		reset := "\033[0m"
+		fmt.Printf("  %s%d) %s (%d)%s\n", color, i+1, preset.name, preset.code, reset)
+	}
+	fmt.Printf("  %d) Custom (enter ANSI 256-color code)\n", len(colorPresets)+1)
+	fmt.Printf("\nChoice [1]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	// Default to first preset
+	if input == "" {
+		return colorPresets[0].code
+	}
+
+	choice, err := strconv.Atoi(input)
+	if err != nil || choice < 1 {
+		return colorPresets[0].code
+	}
+
+	// Preset selection
+	if choice <= len(colorPresets) {
+		return colorPresets[choice-1].code
+	}
+
+	// Custom color
+	if choice == len(colorPresets)+1 {
+		fmt.Print("Enter ANSI 256-color code (0-255): ")
+		input, _ = reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if code, err := strconv.Atoi(input); err == nil && code >= 0 && code <= 255 {
+			return code
+		}
+	}
+
+	return colorPresets[0].code
+}
+
+// configureStatusline updates the profile's settings.json to use our statusline
+// wrapper. If the user already has a statusline command, we wrap it. If not,
+// we set ours as the sole statusline.
+func configureStatusline(p *profile.Profile) error {
+	// Find our own binary path for the statusline command
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("finding own binary: %w", err)
+	}
+
+	settingsPath := p.ConfigDir + "/settings.json"
+
+	var settings map[string]interface{}
+	data, err := os.ReadFile(settingsPath)
+	if err == nil {
+		_ = json.Unmarshal(data, &settings)
+	}
+	if settings == nil {
+		settings = make(map[string]interface{})
+	}
+
+	// Check for existing statusline command
+	var origCmd string
+	if sl, ok := settings["statusLine"].(map[string]interface{}); ok {
+		if cmd, ok := sl["command"].(string); ok && cmd != "" {
+			origCmd = cmd
+		}
+	}
+
+	// Build our statusline command
+	var statuslineCmd string
+	if origCmd != "" {
+		statuslineCmd = fmt.Sprintf("%s statusline -- %s", self, origCmd)
+		fmt.Printf("Wrapping existing statusline: %s\n", origCmd)
+	} else {
+		statuslineCmd = fmt.Sprintf("%s statusline", self)
+		fmt.Println("Configured profile statusline.")
+	}
+
+	settings["statusLine"] = map[string]interface{}{
+		"type":    "command",
+		"command": statuslineCmd,
+		"padding": 0,
+	}
+
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling settings: %w", err)
+	}
+
+	return os.WriteFile(settingsPath, out, 0644)
 }
 
 // offerBootstrap checks if the default ~/.claude directory has config files
@@ -100,12 +209,11 @@ func offerBootstrap(p *profile.Profile) error {
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
 
-	// Default to yes (empty input or "y")
 	if input == "" || input == "y" || input == "yes" {
 		if err := p.CopyBootstrapFiles(files); err != nil {
 			return fmt.Errorf("copying config files: %w", err)
 		}
-		fmt.Printf("Copied %d file(s) into profile.\n\n", len(files))
+		fmt.Printf("Copied %d file(s) into profile.\n", len(files))
 	} else {
 		fmt.Println("Skipped.")
 	}

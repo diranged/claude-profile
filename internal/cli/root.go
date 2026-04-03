@@ -70,10 +70,11 @@ Or manage profiles directly:
 	viper.BindPFlag("profile", root.PersistentFlags().Lookup("profile"))
 
 	root.AddCommand(
-		newLoginCmd(),
+		newCreateCmd(),
 		newListCmd(),
 		newShowCmd(),
 		newDeleteCmd(),
+		newStatuslineCmd(),
 	)
 
 	return root

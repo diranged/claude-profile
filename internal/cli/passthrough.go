@@ -9,12 +9,11 @@ import (
 
 	"github.com/diranged/claude-profile-go/internal/claude"
 	"github.com/diranged/claude-profile-go/internal/profile"
-	"github.com/diranged/claude-profile-go/internal/statusline"
 	"github.com/spf13/cobra"
 )
 
 // runPassthrough is the default command handler. It resolves the active profile,
-// sets up the statusline wrapper, and exec's claude (replacing this process).
+// prints a banner, and exec's claude (replacing this process).
 func runPassthrough(cmd *cobra.Command, _ []string) error {
 	name, err := resolveProfile()
 	if err != nil {
@@ -27,8 +26,19 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 	}
 
 	authStatus := p.AuthStatus()
-	if authStatus == "none" {
-		return fmt.Errorf("profile %q has no credentials. Run: claude-profile login %s", name, name)
+
+	// Allow passthrough without credentials when:
+	// - Running an auth command (e.g., "auth login")
+	// - Using Bedrock/Vertex (credentials come from AWS/GCP env, not keychain)
+	// - Using an API key directly
+	claudeArgs := extractClaudeArgs()
+	isAuthCmd := len(claudeArgs) > 0 && claudeArgs[0] == "auth"
+	hasExternalAuth := os.Getenv("CLAUDE_CODE_USE_BEDROCK") != "" ||
+		os.Getenv("CLAUDE_CODE_USE_VERTEX") != "" ||
+		os.Getenv("ANTHROPIC_API_KEY") != ""
+
+	if authStatus == "none" && !isAuthCmd && !hasExternalAuth {
+		return fmt.Errorf("profile %q has no credentials. Run: claude-profile -p %s auth login", name, name)
 	}
 
 	claudeBin, err := claude.FindBinary()
@@ -36,34 +46,22 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// Collect subscription info for the statusline
+	// Collect subscription info for the banner
 	subType := "unknown"
 	if info, err := p.OAuthDetails(); err == nil {
 		subType = info.SubscriptionType
 	}
 
-	// Set up the statusline wrapper in the profile's config dir.
-	// This writes the wrapper script and updates settings.json.
-	_, origCmd, err := statusline.EnsureWrapper(p.ConfigDir)
-	if err != nil {
-		// Non-fatal: statusline is nice-to-have, not required
-		log.Warnw("failed to set up statusline", "error", err)
-	}
+	cfg := p.LoadConfig()
 
-	// Build environment with profile isolation + statusline env vars
 	env := claude.BuildEnv(p.ConfigDir)
-	env = setEnv(env, statusline.EnvProfileName, name)
-	env = setEnv(env, statusline.EnvProfileAuth, authStatus)
-	env = setEnv(env, statusline.EnvProfileSub, subType)
-	if origCmd != "" {
-		env = setEnv(env, statusline.EnvOrigCommand, origCmd)
-	}
-
-	// Build claude args: everything after our flags.
-	claudeArgs := extractClaudeArgs()
+	env = setEnv(env, "CLAUDE_PROFILE_NAME", name)
+	env = setEnv(env, "CLAUDE_PROFILE_AUTH", authStatus)
+	env = setEnv(env, "CLAUDE_PROFILE_SUB", subType)
+	env = setEnv(env, "CLAUDE_PROFILE_COLOR", fmt.Sprintf("%d", cfg.Color))
 
 	// Print profile banner matching Claude Code's box-drawing style
-	printBanner(name, p.ConfigDir, authStatus, subType)
+	printBanner(name, p.ConfigDir, authStatus, subType, cfg.Color)
 
 	log.Debugw("launching claude",
 		"profile", name,
@@ -115,23 +113,28 @@ func extractClaudeArgs() []string {
 // Version is set at build time via -ldflags.
 var Version = "dev"
 
+// maxBannerWidth caps the banner to match Claude Code's box width.
+const maxBannerWidth = 120
+
 // printBanner renders a styled profile info box matching Claude Code's aesthetic.
-// Uses full terminal width like Claude's "── Claude Code v2.1.91 ──" header.
-func printBanner(name, configDir, auth, sub string) {
+func printBanner(name, configDir, auth, sub string, colorCode int) {
 	const (
-		dim    = "\033[2m"
 		reset  = "\033[0m"
 		accent = "\033[38;5;173m" // Claude's warm orange/brown
 	)
+	color := fmt.Sprintf("\033[38;5;%dm", colorCode)
 
-	// Get terminal width, fall back to 80
+	// Get terminal width, capped to match Claude Code's box width
 	width := 80
 	if w, _, err := term.GetSize(int(os.Stderr.Fd())); err == nil && w > 0 {
 		width = w
 	}
+	if width > maxBannerWidth {
+		width = maxBannerWidth
+	}
 
 	title := fmt.Sprintf(" Claude Profile v%s ", Version)
-	labelWidth := 16 // "Subscription:   " padded
+	labelWidth := 16
 
 	lines := []struct{ label, value string }{
 		{"Profile", name},
@@ -140,43 +143,30 @@ func printBanner(name, configDir, auth, sub string) {
 		{"Subscription", sub},
 	}
 
-	// Inner width is terminal width minus the two border chars
 	innerWidth := width - 2
 
-	green := "\033[38;5;108m" // Muted sage green
-
 	// Top border: ╭─── Claude Profile v0.1.0 ───────────────╮
-	// Visual width: ╭(1) + ───(3) + title + space(1) + dashes(N) + ╮(1) = width
 	topDashes := width - 6 - len(title)
 	if topDashes < 1 {
 		topDashes = 1
 	}
 	fmt.Fprintf(os.Stderr, "\n%s╭───%s%s%s%s %s╮%s\n",
-		green, reset, accent, title, green, repeat("─", topDashes), reset)
+		color, reset, accent, title, color, repeat("─", topDashes), reset)
 
-	// Content lines padded to full width
-	// Visual width: │(1) + text(innerWidth) + │(1) = width
+	// Content lines
 	for _, l := range lines {
-		text := fmt.Sprintf(" %s%-*s%s%s", green, labelWidth, l.label+":", reset+green, l.value)
+		text := fmt.Sprintf(" %s%-*s%s%s", color, labelWidth, l.label+":", reset+color, l.value)
 		visibleLen := 1 + labelWidth + len(l.value)
 		pad := innerWidth - visibleLen
 		if pad < 0 {
 			pad = 0
 		}
 		fmt.Fprintf(os.Stderr, "%s│%s%s%s%s│%s\n",
-			green, reset, text, reset+repeat(" ", pad), green, reset)
+			color, reset, text, reset+repeat(" ", pad), color, reset)
 	}
 
-	// Bottom border: ╰─────────────────────────────────────────╯
-	fmt.Fprintf(os.Stderr, "%s╰%s╯%s\n\n", green, repeat("─", innerWidth), reset)
-}
-
-func repeat(s string, n int) string {
-	out := ""
-	for range n {
-		out += s
-	}
-	return out
+	// Bottom border
+	fmt.Fprintf(os.Stderr, "%s╰%s╯%s\n\n", color, repeat("─", innerWidth), reset)
 }
 
 // setEnv sets or replaces an environment variable in an env slice.
@@ -189,4 +179,12 @@ func setEnv(env []string, key, value string) []string {
 		}
 	}
 	return append(env, prefix+value)
+}
+
+func repeat(s string, n int) string {
+	out := ""
+	for range n {
+		out += s
+	}
+	return out
 }
