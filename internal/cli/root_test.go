@@ -23,7 +23,7 @@ func TestResolveProfile_FromEnvVar(t *testing.T) {
 	t.Setenv("CLAUDE_PROFILE", "envprofile")
 
 	// Re-bind the env var
-	viper.BindEnv("profile", "CLAUDE_PROFILE")
+	_ = viper.BindEnv("profile", "CLAUDE_PROFILE")
 
 	name, err := resolveProfile()
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestNewRootCmd_ProfileFlag(t *testing.T) {
 
 	f := cmd.PersistentFlags().Lookup("profile")
 	require.NotNil(t, f)
-	assert.Equal(t, "p", f.Shorthand)
+	assert.Equal(t, "P", f.Shorthand)
 }
 
 func TestInitLogger_Default(t *testing.T) {

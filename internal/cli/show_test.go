@@ -41,11 +41,10 @@ func TestShowCmd_ProfileExists(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 	output := buf.String()
-	assert.Contains(t, output, "Profile:")
-	assert.Contains(t, output, "work")
-	assert.Contains(t, output, "Config dir:")
-	assert.Contains(t, output, "Keychain service:")
-	assert.Contains(t, output, "Auth:")
+	assert.Contains(t, output, "PROFILE: work")
+	assert.Contains(t, output, "Config dir")
+	assert.Contains(t, output, "Keychain service")
+	assert.Contains(t, output, "Auth")
 }
 
 func TestShowCmd_WithCredentials(t *testing.T) {
@@ -68,12 +67,12 @@ func TestShowCmd_WithCredentials(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 	output := buf.String()
-	assert.Contains(t, output, "Subscription:")
+	assert.Contains(t, output, "Subscription")
 	assert.Contains(t, output, "pro")
-	assert.Contains(t, output, "Rate limit tier:")
+	assert.Contains(t, output, "Rate limit tier")
 	assert.Contains(t, output, "tier1")
-	assert.Contains(t, output, "Expires:")
-	assert.Contains(t, output, "Scopes:")
+	assert.Contains(t, output, "Expires")
+	assert.Contains(t, output, "Scopes")
 	assert.Contains(t, output, "user:read")
 }
 

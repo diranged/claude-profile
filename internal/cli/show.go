@@ -27,23 +27,26 @@ func newShowCmd() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Profile:          %s\n", name)
-			fmt.Fprintf(out, "Config dir:       %s\n", p.ConfigDir)
-			fmt.Fprintf(out, "Keychain service: %s\n", p.ServiceKey)
-			fmt.Fprintf(out, "Auth:             %s\n", p.AuthStatus())
+			auth := p.AuthStatus()
+			ac := authColor(auth)
+
+			_, _ = fmt.Fprintf(out, "\n%s%s PROFILE: %s%s\n\n", colorBold, colorGreen, name, colorReset)
+			_, _ = fmt.Fprintf(out, "  %sConfig dir%s       %s\n", colorCyan, colorReset, p.ConfigDir)
+			_, _ = fmt.Fprintf(out, "  %sKeychain service%s %s\n", colorCyan, colorReset, p.ServiceKey)
+			_, _ = fmt.Fprintf(out, "  %sAuth%s             %s%s%s\n", colorCyan, colorReset, ac, auth, colorReset)
 
 			if info, err := p.OAuthDetails(); err == nil {
-				fmt.Fprintf(out, "Subscription:     %s\n", info.SubscriptionType)
-				fmt.Fprintf(out, "Rate limit tier:  %s\n", info.RateLimitTier)
+				_, _ = fmt.Fprintf(out, "  %sSubscription%s     %s\n", colorCyan, colorReset, info.SubscriptionType)
+				_, _ = fmt.Fprintf(out, "  %sRate limit tier%s  %s\n", colorCyan, colorReset, info.RateLimitTier)
 				if info.ExpiresAt > 0 {
-					t := time.UnixMilli(info.ExpiresAt)
-					fmt.Fprintf(out, "Expires:          %s\n", t.Format(time.RFC3339))
+					_, _ = fmt.Fprintf(out, "  %sExpires%s          %s\n", colorCyan, colorReset, time.UnixMilli(info.ExpiresAt).Format(time.RFC3339))
 				}
 				if len(info.Scopes) > 0 {
-					fmt.Fprintf(out, "Scopes:           %s\n", strings.Join(info.Scopes, ", "))
+					_, _ = fmt.Fprintf(out, "  %sScopes%s           %s\n", colorCyan, colorReset, strings.Join(info.Scopes, ", "))
 				}
 			}
 
+			_, _ = fmt.Fprintln(out)
 			return nil
 		},
 	}

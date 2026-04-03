@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 	"syscall"
 
 	"golang.org/x/term"
@@ -38,7 +39,7 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 		os.Getenv("ANTHROPIC_API_KEY") != ""
 
 	if authStatus == "none" && !isAuthCmd && !hasExternalAuth {
-		return fmt.Errorf("profile %q has no credentials. Run: claude-profile -p %s auth login", name, name)
+		return fmt.Errorf("profile %q has no credentials. Run: claude-profile -P %s auth login", name, name)
 	}
 
 	claudeBin, err := claude.FindBinary()
@@ -82,15 +83,15 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 // that belong to claude-profile, passing everything else through.
 func extractClaudeArgs() []string {
 	args := rawArgs()
-	var result []string
+	result := make([]string, 0, len(args))
 	skip := false
 	for i, arg := range args {
 		if skip {
 			skip = false
 			continue
 		}
-		// Skip our own -p/--profile flag and its value
-		if arg == "-p" || arg == "--profile" {
+		// Skip our own -P/--profile flag and its value
+		if arg == "-P" || arg == "--profile" {
 			// Next arg is the value — skip it too
 			if i+1 < len(args) {
 				skip = true
@@ -101,8 +102,8 @@ func extractClaudeArgs() []string {
 		if len(arg) > 10 && arg[:10] == "--profile=" {
 			continue
 		}
-		// Handle -p<value> (no space) form
-		if len(arg) > 2 && arg[:2] == "-p" && arg[2] != '-' {
+		// Handle -P<value> (no space) form
+		if len(arg) > 2 && arg[:2] == "-P" && arg[2] != '-' {
 			continue
 		}
 		result = append(result, arg)
@@ -111,8 +112,32 @@ func extractClaudeArgs() []string {
 }
 
 // Version is set at build time via -ldflags (e.g., -ldflags "-X ...cli.Version=1.2.3").
-// It defaults to "dev" for local development builds.
-var Version = "dev"
+// Falls back to VCS info embedded by Go, or "dev" if neither is available.
+var Version = buildVersion()
+
+func buildVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "dev"
+	}
+	var revision, dirty string
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			if len(s.Value) >= 7 {
+				revision = s.Value[:7]
+			}
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = "-dirty"
+			}
+		}
+	}
+	if revision != "" {
+		return "dev-" + revision + dirty
+	}
+	return "dev"
+}
 
 // maxBannerWidth caps the banner width to match Claude Code's own box-drawing
 // style, which tops out at 120 columns.

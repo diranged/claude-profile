@@ -7,7 +7,7 @@
 //
 // Usage:
 //
-//	claude-profile -p work [claude args...]
+//	claude-profile -P work [claude args...]
 //	CLAUDE_PROFILE=work claude-profile [claude args...]
 //	claude-profile login work
 //	claude-profile list

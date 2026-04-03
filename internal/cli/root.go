@@ -49,7 +49,7 @@ directory and keychain entry, allowing concurrent sessions across different
 Claude subscriptions.
 
 Use as a drop-in replacement for claude:
-  claude-profile -p work [claude args...]
+  claude-profile -P work [claude args...]
   CLAUDE_PROFILE=work claude-profile [claude args...]
 
 Or manage profiles directly:
@@ -58,7 +58,7 @@ Or manage profiles directly:
 
 		// When no subcommand matches, treat all args as claude passthrough.
 		// This is the primary usage mode — the user runs claude-profile exactly
-		// like they would run claude, with an added -p flag.
+		// like they would run claude, with an added -P flag.
 		RunE:          runPassthrough,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -77,12 +77,12 @@ Or manage profiles directly:
 
 	// Profile flag — the only flag claude-profile owns.
 	// All other flags are passed through to claude.
-	root.PersistentFlags().StringVarP(&profileFlag, "profile", "p", "",
+	root.PersistentFlags().StringVarP(&profileFlag, "profile", "P", "",
 		"profile name (or set CLAUDE_PROFILE env var)")
 
 	// Bind CLAUDE_PROFILE env var as fallback for --profile flag
-	viper.BindEnv("profile", "CLAUDE_PROFILE")
-	viper.BindPFlag("profile", root.PersistentFlags().Lookup("profile"))
+	_ = viper.BindEnv("profile", "CLAUDE_PROFILE")
+	_ = viper.BindPFlag("profile", root.PersistentFlags().Lookup("profile"))
 
 	root.AddCommand(
 		newCreateCmd(),
@@ -91,6 +91,8 @@ Or manage profiles directly:
 		newDeleteCmd(),
 		newStatuslineCmd(),
 	)
+
+	setCustomHelp(root)
 
 	return root
 }
@@ -114,7 +116,7 @@ func Execute() error {
 func resolveProfile() (string, error) {
 	p := viper.GetString("profile")
 	if p == "" {
-		return "", fmt.Errorf("no profile specified. Use -p <name> or set CLAUDE_PROFILE")
+		return "", fmt.Errorf("no profile specified. Use -P <name> or set CLAUDE_PROFILE")
 	}
 	return p, nil
 }

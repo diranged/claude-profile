@@ -27,7 +27,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: fmt vet ## Run tests.
-	go test ./... -coverprofile cover.out -covermode=atomic
+	go test $$(go list ./... | grep -v /cmd) -coverprofile cover.out -covermode=atomic
 
 .PHONY: cover
 cover: ## Display test coverage report.
@@ -55,9 +55,17 @@ build: fmt vet ## Build binary.
 install: build ## Install binary to GOPATH/bin.
 	cp bin/$(BINARY_NAME) $(GOBIN)/$(BINARY_NAME)
 
+.PHONY: vhs
+vhs: ## Install VHS (terminal recorder for demo).
+	go install github.com/charmbracelet/vhs@latest
+
+.PHONY: demo
+demo: build ## Generate demo GIF using VHS.
+	export CLAUDE_PROFILES_DIR=$$(mktemp -d /tmp/claude-demo.XXXXXX) && vhs demo.tape && rm -rf "$$CLAUDE_PROFILES_DIR"
+
 .PHONY: clean
 clean: ## Remove build artifacts.
-	rm -rf bin/ dist/ cover.out
+	rm -rf bin/ dist/ cover.out docs/demo.gif
 
 ##@ Dependencies
 
@@ -65,7 +73,7 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p "$(LOCALBIN)"
 
-GOLANGCI_LINT_VERSION ?= v2.5.0
+GOLANGCI_LINT_VERSION ?= v2.11.4
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 .PHONY: golangci-lint
