@@ -55,8 +55,10 @@ func BuildEnv(configDir string) []string {
 	return env
 }
 
-// RunDirect executes claude without a PTY wrapper. Used for subcommands
-// like "auth login" where we don't want to interfere with the terminal.
+// RunDirect executes the claude binary as a child process without a PTY
+// wrapper, connecting stdin/stdout/stderr directly. It returns the child's exit
+// code and any non-exit error. This is used by subcommands like "auth login"
+// where the caller does not want to replace the current process via exec.
 func RunDirect(binary string, args []string, env []string) (int, error) {
 	cmd := exec.Command(binary, args...)
 	cmd.Env = env

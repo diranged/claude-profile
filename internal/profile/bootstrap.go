@@ -7,8 +7,11 @@ import (
 	"path/filepath"
 )
 
-// Files worth copying from the default ~/.claude config into a new profile.
-// These are user-level configuration files that customize Claude's behavior.
+// bootstrapFiles lists the filenames worth copying from the default ~/.claude
+// config directory into a new profile. These are user-level configuration files
+// that customize Claude Code's behavior (e.g., custom instructions, MCP server
+// configs, local overrides). Credential files are intentionally excluded since
+// each profile should authenticate independently.
 var bootstrapFiles = []string{
 	"CLAUDE.md",
 	"settings.json",
@@ -51,6 +54,8 @@ func (p *Profile) CopyBootstrapFiles(files []string) error {
 	return nil
 }
 
+// copyFile copies a single file from src to dst, preserving the source file's
+// permissions. If dst already exists it is overwritten.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {

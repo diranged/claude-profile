@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newShowCmd builds the "show" subcommand, which prints detailed information
+// about a single profile including its config directory path, keychain service
+// name, authentication status, and (if OAuth credentials exist) subscription
+// type, rate limit tier, token expiry, and granted scopes.
 func newShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show <profile>",

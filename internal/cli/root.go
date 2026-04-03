@@ -20,10 +20,25 @@ import (
 )
 
 var (
-	log         *zap.SugaredLogger
+	// log is the package-level structured logger. It is initialized by initLogger
+	// and defaults to warn-level output unless CLAUDE_PROFILE_DEBUG is set.
+	log *zap.SugaredLogger
+
+	// profileFlag holds the value of the -p/--profile flag, bound via cobra's
+	// PersistentFlags. It is also populated from the CLAUDE_PROFILE env var
+	// through viper.
 	profileFlag string
 )
 
+// newRootCmd builds the top-level cobra command for claude-profile.
+//
+// The root command doubles as the passthrough handler: when no subcommand
+// matches, runPassthrough exec's the real claude binary with the resolved
+// profile. Subcommands (create, list, show, delete, statusline) are registered
+// as children.
+//
+// FParseErrWhitelist.UnknownFlags is enabled so that flags intended for the
+// real claude binary (e.g., --model, -c) are not rejected by cobra.
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "claude-profile",
@@ -104,6 +119,9 @@ func resolveProfile() (string, error) {
 	return p, nil
 }
 
+// initLogger configures the package-level zap logger. By default it logs at
+// warn level. Setting the CLAUDE_PROFILE_DEBUG environment variable to any
+// non-empty value enables debug-level output for troubleshooting.
 func initLogger() {
 	cfg := zap.NewDevelopmentConfig()
 	cfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder

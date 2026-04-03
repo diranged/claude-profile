@@ -23,24 +23,55 @@ import (
 	"strings"
 )
 
+// keychainServicePrefix is the base macOS keychain service name used by Claude
+// Code. When CLAUDE_CONFIG_DIR is set, Claude appends a SHA-256 hash suffix to
+// this prefix to produce a unique keychain entry per config directory.
 const keychainServicePrefix = "Claude Code-credentials"
 
-// Profile represents a named Claude Code authentication profile.
+// Profile represents a named Claude Code authentication profile. Each profile
+// maps to an isolated directory tree and a unique macOS keychain entry, enabling
+// concurrent sessions across different Claude subscriptions.
 type Profile struct {
-	Name       string
-	Dir        string // root profile dir: <profiles_dir>/<name>
-	ConfigDir  string // CLAUDE_CONFIG_DIR value: <profiles_dir>/<name>/config
-	ServiceKey string // macOS keychain service name (hash-suffixed)
+	// Name is the user-chosen profile identifier (e.g., "work", "personal").
+	Name string
+
+	// Dir is the root profile directory: <profiles_dir>/<name>.
+	// Contains claude-profile.yaml and the config/ subdirectory.
+	Dir string
+
+	// ConfigDir is the value assigned to CLAUDE_CONFIG_DIR:
+	// <profiles_dir>/<name>/config. Claude Code stores its settings,
+	// credentials file, and session data here.
+	ConfigDir string
+
+	// ServiceKey is the macOS keychain service name for this profile's
+	// OAuth credentials. It is derived by appending the first 8 hex chars
+	// of SHA-256(ConfigDir) to keychainServicePrefix, matching the algorithm
+	// in Claude Code's internal V51() function.
+	ServiceKey string
 }
 
-// OAuthInfo holds displayable info extracted from stored credentials.
-// Field types must match the actual JSON: scopes is an array, expiresAt
-// is a numeric epoch timestamp in milliseconds.
+// OAuthInfo holds displayable metadata extracted from Claude Code's stored
+// OAuth credentials. The credentials are stored either in the macOS keychain
+// or as a .credentials.json file inside the profile's config directory. The
+// JSON structure nests these fields under a "claudeAiOauth" key.
+//
+// Field types match the upstream JSON schema: Scopes is a string array and
+// ExpiresAt is a Unix epoch timestamp in milliseconds (not seconds).
 type OAuthInfo struct {
-	SubscriptionType string   `json:"subscriptionType"`
-	Scopes           []string `json:"scopes"`
-	ExpiresAt        int64    `json:"expiresAt"`
-	RateLimitTier    string   `json:"rateLimitTier"`
+	// SubscriptionType is the Claude subscription plan (e.g., "pro", "max", "free").
+	SubscriptionType string `json:"subscriptionType"`
+
+	// Scopes lists the OAuth scopes granted to the token (e.g., "user:inference").
+	Scopes []string `json:"scopes"`
+
+	// ExpiresAt is the token expiration time as a Unix epoch in milliseconds.
+	// A value of 0 means the field was absent from the credentials.
+	ExpiresAt int64 `json:"expiresAt"`
+
+	// RateLimitTier indicates the API rate-limit tier associated with the
+	// subscription (e.g., "t3", "t4").
+	RateLimitTier string `json:"rateLimitTier"`
 }
 
 // ProfilesDir returns the base directory for all profiles.
@@ -146,6 +177,9 @@ func List() ([]string, error) {
 	return names, nil
 }
 
+// hasKeychainEntry returns true if the macOS keychain contains a generic
+// password entry matching this profile's ServiceKey and the current user.
+// It shells out to the "security" CLI tool, which is macOS-specific.
 func (p *Profile) hasKeychainEntry() bool {
 	err := exec.Command("security", "find-generic-password",
 		"-s", p.ServiceKey, "-a", currentUser()).Run()
@@ -163,6 +197,8 @@ func keychainService(configDir string) string {
 	return fmt.Sprintf("%s-%x", keychainServicePrefix, h[:4])
 }
 
+// currentUser returns the current OS username for use as the keychain account
+// name. Falls back to the USER environment variable if user.Current() fails.
 func currentUser() string {
 	u, err := user.Current()
 	if err != nil {

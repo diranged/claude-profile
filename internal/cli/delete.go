@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newDeleteCmd builds the "delete" subcommand, which removes a profile's
+// directory tree and its macOS keychain entry. By default it prompts for
+// confirmation; the -f/--force flag skips the prompt.
 func newDeleteCmd() *cobra.Command {
 	var force bool
 

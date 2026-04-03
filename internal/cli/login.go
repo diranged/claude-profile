@@ -12,10 +12,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Color presets offered during the setup wizard.
+// colorPresets defines the named ANSI 256-color codes offered during the
+// interactive profile creation wizard. The first entry (Green) is the default
+// when the user presses Enter without choosing.
 var colorPresets = []struct {
-	name string
-	code int
+	name string // human-readable name shown in the menu
+	code int    // ANSI 256-color code (0-255)
 }{
 	{"Green (default)", 108},
 	{"Blue", 33},
@@ -27,6 +29,14 @@ var colorPresets = []struct {
 	{"Yellow", 226},
 }
 
+// newCreateCmd builds the "create" subcommand, which walks the user through
+// an interactive wizard to set up a new profile. The wizard:
+//  1. Creates the profile's isolated config directory.
+//  2. Offers to copy config files (CLAUDE.md, settings.json, etc.) from
+//     the default ~/.claude directory.
+//  3. Lets the user pick a banner/statusline color.
+//  4. Configures the Claude Code statusline to display profile info.
+//  5. Prints next-step instructions for authenticating the new profile.
 func newCreateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "create <profile>",
@@ -95,7 +105,9 @@ Example:
 	}
 }
 
-// pickColor presents color presets and returns the selected ANSI 256-color code.
+// pickColor presents an interactive menu of color presets plus a custom-code
+// option, reads the user's choice from stdin, and returns the selected ANSI
+// 256-color code. Invalid or empty input defaults to the first preset (green, 108).
 func pickColor() int {
 	fmt.Println("Pick a color for this profile's banner and statusline:")
 	for i, preset := range colorPresets {
@@ -138,9 +150,12 @@ func pickColor() int {
 	return colorPresets[0].code
 }
 
-// configureStatusline updates the profile's settings.json to use our statusline
-// wrapper. If the user already has a statusline command, we wrap it. If not,
-// we set ours as the sole statusline.
+// configureStatusline updates the profile's settings.json to use claude-profile's
+// statusline wrapper. If the user already has a statusline command configured,
+// the existing command is preserved by chaining it after our wrapper using the
+// "-- <original>" syntax. If there is no existing statusline, we set ours as
+// the sole statusline command. The statusline command is set with padding: 0
+// and type: "command" to match Claude Code's expected format.
 func configureStatusline(p *profile.Profile) error {
 	// Find our own binary path for the statusline command
 	self, err := os.Executable()

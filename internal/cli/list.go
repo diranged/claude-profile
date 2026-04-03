@@ -7,6 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newListCmd builds the "list" subcommand, which enumerates all profiles found
+// in the profiles directory (default: ~/.claude-profiles/) and prints each
+// profile's name alongside its authentication status (keychain, file, or none).
 func newListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",

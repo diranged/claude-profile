@@ -11,6 +11,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newStatuslineCmd builds the "statusline" subcommand, which acts as a Claude
+// Code statusline provider. Claude Code invokes the configured statusline
+// command, piping JSON session data to stdin and reading display text from
+// stdout.
+//
+// This command:
+//  1. Reads all of stdin (the JSON session blob Claude provides).
+//  2. Prints a colored line showing the active profile name, auth status, and
+//     subscription type (read from CLAUDE_PROFILE_* env vars set at launch).
+//  3. Optionally chains to a wrapped command (everything after "--") by piping
+//     the same stdin JSON into it, allowing the user's original statusline tool
+//     to still function.
+//
+// DisableFlagParsing is set so that flags after "--" are not consumed by cobra.
 func newStatuslineCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "statusline [-- command args...]",

@@ -19,6 +19,8 @@ import (
 	"github.com/diranged/claude-profile-go/internal/cli"
 )
 
+// main initializes the CLI and exits with a non-zero status on error.
+// All real logic lives in the cli package; main simply delegates to cli.Execute.
 func main() {
 	if err := cli.Execute(); err != nil {
 		os.Exit(1)

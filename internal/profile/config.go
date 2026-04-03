@@ -15,6 +15,9 @@ type Config struct {
 	Color int `yaml:"color,omitempty"`
 }
 
+// configFilename is the name of the YAML file storing per-profile settings.
+// It lives in the profile's root directory (not the config/ subdirectory),
+// keeping it separate from Claude Code's own configuration files.
 const configFilename = "claude-profile.yaml"
 
 // DefaultConfig returns the default profile configuration.

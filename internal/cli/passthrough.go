@@ -110,13 +110,20 @@ func extractClaudeArgs() []string {
 	return result
 }
 
-// Version is set at build time via -ldflags.
+// Version is set at build time via -ldflags (e.g., -ldflags "-X ...cli.Version=1.2.3").
+// It defaults to "dev" for local development builds.
 var Version = "dev"
 
-// maxBannerWidth caps the banner to match Claude Code's box width.
+// maxBannerWidth caps the banner width to match Claude Code's own box-drawing
+// style, which tops out at 120 columns.
 const maxBannerWidth = 120
 
-// printBanner renders a styled profile info box matching Claude Code's aesthetic.
+// printBanner renders a Unicode box-drawing banner to stderr showing the active
+// profile's name, config directory, auth status, and subscription type. The
+// banner is colored using the profile's configured ANSI 256-color code and
+// adapts its width to the terminal (up to maxBannerWidth). Output goes to
+// stderr so it does not interfere with Claude's stdout in piped/non-interactive
+// usage.
 func printBanner(name, configDir, auth, sub string, colorCode int) {
 	const (
 		reset  = "\033[0m"
@@ -169,7 +176,11 @@ func printBanner(name, configDir, auth, sub string, colorCode int) {
 	fmt.Fprintf(os.Stderr, "%s╰%s╯%s\n\n", color, repeat("─", innerWidth), reset)
 }
 
-// setEnv sets or replaces an environment variable in an env slice.
+// setEnv sets or replaces an environment variable in an env slice ([]string
+// of "KEY=VALUE" entries). If the key already exists, its value is updated
+// in-place; otherwise a new entry is appended. This avoids mutating
+// os.Environ() directly and lets us build a custom environment for
+// syscall.Exec.
 func setEnv(env []string, key, value string) []string {
 	prefix := key + "="
 	for i, e := range env {
@@ -181,6 +192,8 @@ func setEnv(env []string, key, value string) []string {
 	return append(env, prefix+value)
 }
 
+// repeat returns s concatenated n times. Used for generating box-drawing
+// border lines in the banner.
 func repeat(s string, n int) string {
 	out := ""
 	for range n {
