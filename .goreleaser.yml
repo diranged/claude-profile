@@ -43,6 +43,6 @@ changelog:
 release:
   github:
     owner: diranged
-    name: claude-profile-go
+    name: claude-profile
   draft: false
   prerelease: auto
