@@ -90,9 +90,9 @@ main() {
     local checksum_url="https://github.com/${REPO}/releases/download/${version}/checksums.txt"
 
     # download to temp dir
-    local tmpdir
-    tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
+    TMPDIR_CLEANUP=$(mktemp -d)
+    trap 'rm -rf "$TMPDIR_CLEANUP"' EXIT
+    local tmpdir="$TMPDIR_CLEANUP"
 
     info "Downloading ${archive}..."
     if ! curl -fsSL -o "${tmpdir}/${archive}" "$url"; then
