@@ -23,19 +23,37 @@ Each profile is a directory under `~/.claude-profiles/<name>/` containing:
 
 ## Installation
 
+### Quick Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/diranged/claude-profile/main/install.sh | sh
+```
+
+This detects your OS and architecture, downloads the latest release, verifies the SHA-256 checksum, and installs to `/usr/local/bin`.
+
+To install a specific version or to a custom directory:
+
+```bash
+# Pin a version
+curl -fsSL https://raw.githubusercontent.com/diranged/claude-profile/main/install.sh | VERSION=v0.1.0 sh
+
+# Custom install directory
+curl -fsSL https://raw.githubusercontent.com/diranged/claude-profile/main/install.sh | INSTALL_DIR=~/.local/bin sh
+```
+
+### From GitHub Releases
+
+Download a prebuilt binary from the [Releases](https://github.com/diranged/claude-profile/releases) page. Binaries are available for Linux, macOS, and Windows on both amd64 and arm64.
+
 ### From Source
 
 Requires Go 1.25+:
 
 ```bash
-git clone https://github.com/diranged/claude-profile-go.git
-cd claude-profile-go
+git clone https://github.com/diranged/claude-profile.git
+cd claude-profile
 make install    # Builds and copies to $GOPATH/bin
 ```
-
-### From GitHub Releases
-
-Download a prebuilt binary from the [Releases](https://github.com/diranged/claude-profile-go/releases) page. Binaries are available for Linux, macOS, and Windows on both amd64 and arm64.
 
 ### From Go
 
