@@ -8,7 +8,6 @@
 # Environment variables:
 #   VERSION      — release tag to install (default: latest)
 #   INSTALL_DIR  — where to place the binary (default: /usr/local/bin)
-#   GITHUB_TOKEN — optional token for private repos or to avoid rate limits
 
 set -eu
 
@@ -25,15 +24,6 @@ error() { printf '  \033[31m✗\033[0m %s\n' "$1" >&2; exit 1; }
 need_cmd() {
     if ! command -v "$1" > /dev/null 2>&1; then
         error "required command not found: $1"
-    fi
-}
-
-# curl wrapper that adds auth header when GITHUB_TOKEN is set
-gh_curl() {
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-        curl -H "Authorization: token ${GITHUB_TOKEN}" "$@"
-    else
-        curl "$@"
     fi
 }
 
@@ -66,7 +56,7 @@ resolve_version() {
     # Follow the /releases/latest redirect and extract the tag from the final URL.
     # No API auth or rate limits required.
     local url
-    url=$(gh_curl -fsSL -o /dev/null -w '%{url_effective}' \
+    url=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
         "https://github.com/${REPO}/releases/latest")
     local tag="${url##*/}"
     if [ -z "$tag" ] || [ "$tag" = "latest" ]; then
@@ -105,14 +95,14 @@ main() {
     trap 'rm -rf "$tmpdir"' EXIT
 
     info "Downloading ${archive}..."
-    if ! gh_curl -fsSL -o "${tmpdir}/${archive}" "$url"; then
+    if ! curl -fsSL -o "${tmpdir}/${archive}" "$url"; then
         error "download failed — check that ${version} exists at https://github.com/${REPO}/releases"
     fi
 
     # verify checksum if sha256sum or shasum is available
     if command -v sha256sum > /dev/null 2>&1 || command -v shasum > /dev/null 2>&1; then
         info "Verifying checksum..."
-        gh_curl -fsSL -o "${tmpdir}/checksums.txt" "$checksum_url"
+        curl -fsSL -o "${tmpdir}/checksums.txt" "$checksum_url"
         local expected
         expected=$(grep "${archive}" "${tmpdir}/checksums.txt" | awk '{print $1}')
         if [ -z "$expected" ]; then
