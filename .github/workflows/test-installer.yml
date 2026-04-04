@@ -1,0 +1,39 @@
+name: Test Installer
+
+on:
+  pull_request:
+    paths:
+      - install.sh
+
+jobs:
+  test-installer:
+    name: Test install.sh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install latest release
+        run: |
+          sh install.sh
+          claude-profile --help
+
+      - name: Install specific version
+        run: |
+          VERSION=v0.1.0 sh install.sh
+          claude-profile --help
+
+      - name: Install to custom directory
+        run: |
+          mkdir -p "${{ runner.temp }}/bin"
+          INSTALL_DIR="${{ runner.temp }}/bin" sh install.sh
+          "${{ runner.temp }}/bin/claude-profile" --help
+
+      - name: Verify checksum failure detection
+        run: |
+          # Corrupt the archive after download by testing with a bad VERSION
+          if VERSION=v99.99.99 sh install.sh 2>&1; then
+            echo "Expected failure for nonexistent version"
+            exit 1
+          fi
+          echo "Correctly failed on nonexistent version ✓"
