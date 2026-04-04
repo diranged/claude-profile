@@ -11,16 +11,6 @@ jobs:
       contents: write
       pull-requests: read
     steps:
-      - name: Get Next Version
-        id: semver
-        uses: ietf-tools/semver-action@c90370b2958652d71c06a3484129a4d423a6d8a8 # v1
-        with:
-          token: ${{ github.token }}
-          branch: main
-          fallbackTag: v0.0.0
-          majorList: breaking
-          minorList: feat, feature
-          patchList: fix, bugfix, perf, refactor, test, tests, chore, doc
       - name: Draft Release
         uses: release-drafter/release-drafter@139054aeaa9adc52ab36ddf67437541f039b88e2 # v7
         env:
@@ -28,4 +18,3 @@ jobs:
         with:
           commitish: main
           disable-autolabeler: true
-          version: ${{ steps.semver.outputs.next }}
