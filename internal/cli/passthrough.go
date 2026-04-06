@@ -56,6 +56,14 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 	cfg := p.LoadConfig()
 
 	env := claude.BuildEnv(p.ConfigDir)
+
+	// When the profile has SSO credentials, strip provider flags that would
+	// override the auth method. The user's intent is to use the Anthropic API.
+	if authStatus == "keychain" || authStatus == "file" {
+		env = claude.UnsetEnv(env, "CLAUDE_CODE_USE_BEDROCK")
+		env = claude.UnsetEnv(env, "CLAUDE_CODE_USE_VERTEX")
+	}
+
 	env = setEnv(env, "CLAUDE_PROFILE_NAME", name)
 	env = setEnv(env, "CLAUDE_PROFILE_AUTH", authStatus)
 	env = setEnv(env, "CLAUDE_PROFILE_SUB", subType)
@@ -113,7 +121,13 @@ func extractClaudeArgs() []string {
 
 // Version is set at build time via -ldflags (e.g., -ldflags "-X ...cli.Version=1.2.3").
 // Falls back to VCS info embedded by Go, or "dev" if neither is available.
-var Version = buildVersion()
+var Version string
+
+func init() {
+	if Version == "" {
+		Version = buildVersion()
+	}
+}
 
 func buildVersion() string {
 	info, ok := debug.ReadBuildInfo()

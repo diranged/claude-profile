@@ -55,6 +55,18 @@ func BuildEnv(configDir string) []string {
 	return env
 }
 
+// UnsetEnv removes a named environment variable from an env slice. If the key
+// is not present, the slice is returned unchanged.
+func UnsetEnv(env []string, key string) []string {
+	prefix := key + "="
+	for i, e := range env {
+		if len(e) >= len(prefix) && e[:len(prefix)] == prefix {
+			return append(env[:i], env[i+1:]...)
+		}
+	}
+	return env
+}
+
 // RunDirect executes the claude binary as a child process without a PTY
 // wrapper, connecting stdin/stdout/stderr directly. It returns the child's exit
 // code and any non-exit error. This is used by subcommands like "auth login"
