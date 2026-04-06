@@ -121,7 +121,13 @@ func extractClaudeArgs() []string {
 
 // Version is set at build time via -ldflags (e.g., -ldflags "-X ...cli.Version=1.2.3").
 // Falls back to VCS info embedded by Go, or "dev" if neither is available.
-var Version = buildVersion()
+var Version string
+
+func init() {
+	if Version == "" {
+		Version = buildVersion()
+	}
+}
 
 func buildVersion() string {
 	info, ok := debug.ReadBuildInfo()
