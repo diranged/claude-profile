@@ -102,6 +102,30 @@ func TestRunDirect_BinaryNotFound(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestUnsetEnv_RemovesKey(t *testing.T) {
+	env := []string{"FOO=bar", "CLAUDE_CODE_USE_BEDROCK=1", "BAZ=qux"}
+	result := UnsetEnv(env, "CLAUDE_CODE_USE_BEDROCK")
+	assert.Equal(t, []string{"FOO=bar", "BAZ=qux"}, result)
+}
+
+func TestUnsetEnv_KeyNotPresent(t *testing.T) {
+	env := []string{"FOO=bar", "BAZ=qux"}
+	result := UnsetEnv(env, "CLAUDE_CODE_USE_BEDROCK")
+	assert.Equal(t, []string{"FOO=bar", "BAZ=qux"}, result)
+}
+
+func TestUnsetEnv_EmptyEnv(t *testing.T) {
+	result := UnsetEnv([]string{}, "FOO")
+	assert.Empty(t, result)
+}
+
+func TestUnsetEnv_DoesNotMatchPrefix(t *testing.T) {
+	env := []string{"CLAUDE_CODE_USE_BEDROCK_EXTRA=1", "FOO=bar"}
+	result := UnsetEnv(env, "CLAUDE_CODE_USE_BEDROCK")
+	// Should not remove CLAUDE_CODE_USE_BEDROCK_EXTRA since it's a different key
+	assert.Equal(t, []string{"CLAUDE_CODE_USE_BEDROCK_EXTRA=1", "FOO=bar"}, result)
+}
+
 func TestBuildEnv_PreservesOtherVars(t *testing.T) {
 	t.Setenv("MY_TEST_VAR_12345", "hello")
 
