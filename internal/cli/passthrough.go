@@ -3,13 +3,16 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"syscall"
 
 	"golang.org/x/term"
 
 	"github.com/diranged/claude-profile-go/internal/claude"
 	"github.com/diranged/claude-profile-go/internal/profile"
+	"github.com/diranged/claude-profile-go/internal/sessions"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +36,15 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 	// - Using Bedrock/Vertex (credentials come from AWS/GCP env, not keychain)
 	// - Using an API key directly
 	claudeArgs := extractClaudeArgs()
+
+	// Check --resume flag and validate that cwd matches the session's recorded
+	// working directory, unless --resume-anywhere was specified.
+	if resumeID := extractResumeID(claudeArgs); resumeID != "" && !hasResumeAnywhereFlag(rawArgs()) {
+		if err := validateResumeCwd(p, resumeID); err != nil {
+			return err
+		}
+	}
+
 	isAuthCmd := len(claudeArgs) > 0 && claudeArgs[0] == "auth"
 	hasExternalAuth := os.Getenv("CLAUDE_CODE_USE_BEDROCK") != "" ||
 		os.Getenv("CLAUDE_CODE_USE_VERTEX") != "" ||
@@ -112,6 +124,10 @@ func extractClaudeArgs() []string {
 		}
 		// Handle -P<value> (no space) form
 		if len(arg) > 2 && arg[:2] == "-P" && arg[2] != '-' {
+			continue
+		}
+		// Strip --resume-anywhere (our flag, not claude's)
+		if arg == "--resume-anywhere" {
 			continue
 		}
 		result = append(result, arg)
@@ -229,6 +245,128 @@ func setEnv(env []string, key, value string) []string {
 		}
 	}
 	return append(env, prefix+value)
+}
+
+// extractResumeID returns the session ID from --resume/−r args, or "" if
+// the flag is absent or bare (no ID provided — let claude show its picker).
+func extractResumeID(args []string) string {
+	for i, arg := range args {
+		// --resume <id>
+		if arg == "--resume" && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			return args[i+1]
+		}
+		// --resume=<id>
+		if strings.HasPrefix(arg, "--resume=") {
+			return arg[len("--resume="):]
+		}
+		// -r <id>
+		if arg == "-r" && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			return args[i+1]
+		}
+		// -r<id> (joined form, only if next char is not -)
+		if len(arg) > 2 && arg[:2] == "-r" && arg[2] != '-' {
+			return arg[2:]
+		}
+	}
+	return ""
+}
+
+// hasResumeAnywhereFlag returns true if --resume-anywhere appears in the args.
+func hasResumeAnywhereFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--resume-anywhere" {
+			return true
+		}
+	}
+	return false
+}
+
+// validateResumeCwd looks up the session by ID prefix and checks that the
+// current working directory matches the session's recorded cwd.
+func validateResumeCwd(p *profile.Profile, resumeID string) error {
+	matches, err := sessions.FindByPrefix(p.ConfigDir, resumeID)
+	if err != nil {
+		log.Debugw("session lookup failed, passing through", "error", err)
+		return nil
+	}
+
+	if len(matches) == 0 {
+		log.Debugw("session not found in profile, passing through", "resumeID", resumeID)
+		return nil
+	}
+
+	if len(matches) > 1 {
+		msg := fmt.Sprintf("session prefix %q matches multiple sessions:\n", resumeID)
+		for _, s := range matches {
+			branch := ""
+			if s.GitBranch != "" {
+				branch = s.GitBranch
+			}
+			msg += fmt.Sprintf("  %-8s  %-40s  %-10s  %s\n",
+				shortID(s.ID), s.Cwd, branch, s.ModTime.Format("2006-01-02 15:04"))
+		}
+		return fmt.Errorf("%s", msg)
+	}
+
+	session := matches[0]
+	if session.Cwd == "" {
+		log.Debugw("session has no recorded cwd, passing through", "resumeID", resumeID)
+		return nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+
+	sessionCwd := resolvePath(session.Cwd)
+	currentCwd := resolvePath(cwd)
+
+	if sessionCwd == currentCwd {
+		return nil
+	}
+
+	profileName := p.Name
+	branch := ""
+	if session.GitBranch != "" {
+		branch = fmt.Sprintf("\n  Branch:       %s", session.GitBranch)
+	}
+	prompt := ""
+	if session.FirstPrompt != "" {
+		prompt = fmt.Sprintf("\n  First prompt: %s", session.FirstPrompt)
+	}
+
+	return fmt.Errorf(
+		"session %s was started in a different directory.\n\n"+
+			"  Session cwd:  %s\n"+
+			"  Current cwd:  %s%s%s\n\n"+
+			"  To resume, cd to the correct directory:\n"+
+			"    cd %s && claude-profile -P %s --resume %s\n\n"+
+			"  Or force-resume from this directory:\n"+
+			"    claude-profile -P %s --resume-anywhere %s",
+		shortID(session.ID),
+		session.Cwd,
+		cwd, branch, prompt,
+		session.Cwd, profileName, shortID(session.ID),
+		profileName, shortID(session.ID),
+	)
+}
+
+// shortID returns the first 8 characters of a session UUID for display.
+func shortID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}
+
+// resolvePath returns the canonical absolute path, resolving symlinks.
+func resolvePath(p string) string {
+	resolved, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	return filepath.Clean(resolved)
 }
 
 // repeat returns s concatenated n times. Used for generating box-drawing

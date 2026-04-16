@@ -48,6 +48,7 @@ func setCustomHelp(root *cobra.Command) {
 			{"list", "List all profiles and their auth status"},
 			{"show <profile>", "Show detailed profile info"},
 			{"delete <profile>", "Remove a profile and its credentials"},
+			{"sessions", "List sessions across all repos"},
 			{"statusline", "Statusline wrapper for Claude Code"},
 		}
 		for _, c := range commands {
@@ -56,6 +57,7 @@ func setCustomHelp(root *cobra.Command) {
 
 		_, _ = fmt.Fprintf(out, "\n%s%s FLAGS%s\n\n", colorBold, colorGreen, colorReset)
 		_, _ = fmt.Fprintf(out, "  %s-P, --profile%s <name>   Profile to use (or set %sCLAUDE_PROFILE%s)\n", colorCyan, colorReset, colorYellow, colorReset)
+		_, _ = fmt.Fprintf(out, "  %s--resume-anywhere%s      Skip cwd check when resuming a session\n", colorCyan, colorReset)
 		_, _ = fmt.Fprintf(out, "  %s-h, --help%s             Show this help\n", colorCyan, colorReset)
 
 		_, _ = fmt.Fprintf(out, "\n%s%s AUTH METHODS%s\n\n", colorBold, colorGreen, colorReset)
@@ -80,6 +82,10 @@ func setCustomHelp(root *cobra.Command) {
 		_, _ = fmt.Fprintf(out, "  %s$%s claude-profile -P work --model opus -p /path/to/project\n\n", colorYellow, colorReset)
 		_, _ = fmt.Fprintf(out, "  %s# See what profiles exist%s\n", colorDim, colorReset)
 		_, _ = fmt.Fprintf(out, "  %s$%s claude-profile list\n\n", colorYellow, colorReset)
+
+		_, _ = fmt.Fprintf(out, "  %s# List recent sessions across all repos%s\n", colorDim, colorReset)
+		_, _ = fmt.Fprintf(out, "  %s$%s claude-profile -P work sessions\n", colorYellow, colorReset)
+		_, _ = fmt.Fprintf(out, "  %s$%s claude-profile -P work sessions --since 30d --repo myapp\n\n", colorYellow, colorReset)
 
 		_, _ = fmt.Fprintf(out, "  %sUse \"claude-profile [command] --help\" for more info on a command.%s\n\n", colorDim, colorReset)
 	})

@@ -90,6 +90,7 @@ Or manage profiles directly:
 		newShowCmd(),
 		newDeleteCmd(),
 		newStatuslineCmd(),
+		newSessionsCmd(),
 	)
 
 	setCustomHelp(root)
