@@ -251,23 +251,37 @@ func setEnv(env []string, key, value string) []string {
 	return append(env, prefix+value)
 }
 
-// extractResumeID returns the session ID from --resume/−r args, or "" if
-// the flag is absent or bare (no ID provided — let claude show its picker).
+// extractResumeID scans the arg list for Claude Code's --resume / -r flag
+// and returns the session ID that follows it, or "" if:
+//   - The flag is not present at all
+//   - The flag is bare (no ID after it) — this means "show the session picker",
+//     which we let claude handle natively
+//
+// All four syntactic forms are handled:
+//
+//	--resume <id>     long form with space separator
+//	--resume=<id>     long form with equals sign
+//	-r <id>           short form with space separator
+//	-r<id>            short form with joined value (no space)
+//
+// The next-arg check (!strings.HasPrefix(args[i+1], "-")) prevents treating
+// another flag as the session ID. This means bare --resume (no ID, followed
+// by another flag like --model) correctly returns "".
 func extractResumeID(args []string) string {
 	for i, arg := range args {
-		// --resume <id>
+		// --resume <id> (long form, space-separated)
 		if arg == flagResume && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 			return args[i+1]
 		}
-		// --resume=<id>
+		// --resume=<id> (long form, equals-sign)
 		if strings.HasPrefix(arg, flagResumePrefix) {
 			return arg[len(flagResumePrefix):]
 		}
-		// -r <id>
+		// -r <id> (short form, space-separated)
 		if arg == flagResumeShort && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 			return args[i+1]
 		}
-		// -r<id> (joined form, only if next char is not -)
+		// -r<id> (short form, joined value — e.g. "-rabc123")
 		if len(arg) > len(flagResumeShort) && arg[:len(flagResumeShort)] == flagResumeShort && arg[len(flagResumeShort)] != '-' {
 			return arg[len(flagResumeShort):]
 		}
@@ -275,7 +289,10 @@ func extractResumeID(args []string) string {
 	return ""
 }
 
-// hasResumeAnywhereFlag returns true if --resume-anywhere appears in the args.
+// hasResumeAnywhereFlag scans the raw arg list (before any stripping) for
+// the --resume-anywhere flag. This is checked against rawArgs() (not
+// claudeArgs) because extractClaudeArgs replaces --resume-anywhere with
+// --resume, so it would no longer be visible in the processed arg list.
 func hasResumeAnywhereFlag(args []string) bool {
 	for _, arg := range args {
 		if arg == flagResumeAnywhere {
@@ -285,25 +302,49 @@ func hasResumeAnywhereFlag(args []string) bool {
 	return false
 }
 
-// validateResumeCwd looks up the session by ID prefix and checks that the
-// current working directory matches the session's recorded cwd.
+// validateResumeCwd is the core of the --resume directory safety check.
+// Given a session ID (or prefix), it:
+//
+//  1. Looks up matching sessions in the profile's config directory.
+//  2. If no matches: logs a debug message and returns nil (pass through to
+//     claude, which may have its own lookup logic).
+//  3. If multiple matches: returns an error listing all candidates so the
+//     user can pick a more specific prefix.
+//  4. If exactly one match: compares the session's recorded cwd with the
+//     current working directory (both resolved through symlinks). If they
+//     match, returns nil. If they differ, returns a formatted error with
+//     the correct cd command and a --resume-anywhere hint.
+//
+// The function is intentionally lenient: when in doubt (lookup error, no cwd
+// recorded, can't determine current dir), it passes through rather than
+// blocking the user. The safety check is advisory, not a hard gate.
 func validateResumeCwd(p *profile.Profile, resumeID string) error {
 	matches, err := sessions.FindByPrefix(p.ConfigDir, resumeID)
 	if err != nil {
+		// Lookup failure (e.g. permissions, corrupt directory) — don't block
+		// the user, just log and let claude try its own resolution.
 		log.Debugw("session lookup failed, passing through", "error", err)
 		return nil
 	}
 
+	// No matches in this profile's sessions. The session might exist in a
+	// different profile, or claude may have its own lookup path. Pass through.
 	if len(matches) == 0 {
 		log.Debugw("session not found in profile, passing through", "resumeID", resumeID)
 		return nil
 	}
 
+	// Multiple matches — the prefix is ambiguous. Show the user all candidates
+	// so they can use a longer prefix to disambiguate.
 	if len(matches) > 1 {
 		return formatAmbiguousResumeError(resumeID, matches)
 	}
 
+	// Exactly one match — check if the cwd lines up.
 	session := matches[0]
+
+	// If the session has no recorded cwd (rare edge case — JSONL with no user
+	// record), we can't validate, so pass through.
 	if session.Cwd == "" {
 		log.Debugw("session has no recorded cwd, passing through", "resumeID", resumeID)
 		return nil
@@ -311,18 +352,30 @@ func validateResumeCwd(p *profile.Profile, resumeID string) error {
 
 	cwd, err := os.Getwd()
 	if err != nil {
+		// Can't determine current directory — don't block, pass through.
 		return nil
 	}
 
+	// Compare paths after resolving symlinks and cleaning, so that
+	// /var → /private/var (macOS) and trailing slashes don't cause
+	// false mismatches.
 	if resolvePath(session.Cwd) == resolvePath(cwd) {
 		return nil
 	}
 
+	// Cwd mismatch — build a helpful error with the correct cd command.
 	return formatCwdMismatchError(session, cwd, p.Name)
 }
 
 // formatAmbiguousResumeError builds the error shown when a session ID prefix
-// matches more than one session.
+// matches more than one session. It lists all candidates with their cwd,
+// branch, and timestamp so the user can pick a more specific prefix.
+//
+// Example output:
+//
+//	session prefix "abc" matches multiple sessions:
+//	  abc12345  /Users/matt/git/myorg/api    main  2026-04-15 14:30
+//	  abc99999  /Users/matt/git/personal/blog main  2026-04-13 20:45
 func formatAmbiguousResumeError(prefix string, matches []sessions.Session) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "session prefix %q matches multiple sessions:\n", prefix)
@@ -334,7 +387,26 @@ func formatAmbiguousResumeError(prefix string, matches []sessions.Session) error
 }
 
 // formatCwdMismatchError builds the error shown when the user tries to resume
-// a session from the wrong directory.
+// a session from the wrong directory. The error includes:
+//   - The session's recorded cwd and the user's current cwd
+//   - The git branch and first prompt (if available) for identification
+//   - A copy-pasteable cd + resume command to get to the right place
+//   - A --resume-anywhere command as an escape hatch
+//
+// Example output:
+//
+//	session abc12345 was started in a different directory.
+//
+//	  Session cwd:  /Users/matt/git/myorg/api
+//	  Current cwd:  /Users/matt/git/personal/blog
+//	  Branch:       main
+//	  First prompt: fix the flaky integration test
+//
+//	  To resume, cd to the correct directory:
+//	    cd /Users/matt/git/myorg/api && claude-profile -P me --resume abc12345
+//
+//	  Or force-resume from this directory:
+//	    claude-profile -P me --resume-anywhere abc12345
 func formatCwdMismatchError(session sessions.Session, currentCwd, profileName string) error {
 	sid := shortID(session.ID)
 
@@ -357,6 +429,9 @@ func formatCwdMismatchError(session sessions.Session, currentCwd, profileName st
 }
 
 // shortID returns the first 8 characters of a session UUID for display.
+// Session UUIDs are full v4 UUIDs (36 chars), but 8 characters is enough
+// to identify them uniquely in practice and keeps the output compact.
+// If the ID is already 8 chars or shorter, it's returned as-is.
 func shortID(id string) string {
 	if len(id) > 8 {
 		return id[:8]
@@ -364,7 +439,15 @@ func shortID(id string) string {
 	return id
 }
 
-// resolvePath returns the canonical absolute path, resolving symlinks.
+// resolvePath returns the canonical absolute path after resolving symlinks.
+// This is used when comparing the session's recorded cwd with the user's
+// current cwd to avoid false mismatches caused by:
+//   - macOS /var → /private/var symlink
+//   - User-created symlinks to repos
+//   - Trailing slashes or . / .. components
+//
+// If symlink resolution fails (e.g. the path doesn't exist), falls back
+// to filepath.Clean which at least normalises the path string.
 func resolvePath(p string) string {
 	resolved, err := filepath.EvalSymlinks(p)
 	if err != nil {
