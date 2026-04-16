@@ -349,9 +349,9 @@ func formatCwdMismatchError(session sessions.Session, currentCwd, profileName st
 		fmt.Fprintf(&b, "  First prompt: %s\n", session.FirstPrompt)
 	}
 	fmt.Fprintf(&b, "\n  To resume, cd to the correct directory:\n")
-	fmt.Fprintf(&b, "    cd %s && claude-profile -P %s --resume %s\n", session.Cwd, profileName, sid)
+	fmt.Fprintf(&b, "    cd %s && claude-profile -P %s %s %s\n", session.Cwd, profileName, flagResume, sid)
 	fmt.Fprintf(&b, "\n  Or force-resume from this directory:\n")
-	fmt.Fprintf(&b, "    claude-profile -P %s --resume-anywhere %s", profileName, sid)
+	fmt.Fprintf(&b, "    claude-profile -P %s %s %s", profileName, flagResumeAnywhere, sid)
 
 	return fmt.Errorf("%s", b.String())
 }

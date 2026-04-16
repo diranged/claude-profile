@@ -57,7 +57,7 @@ func setCustomHelp(root *cobra.Command) {
 
 		_, _ = fmt.Fprintf(out, "\n%s%s FLAGS%s\n\n", colorBold, colorGreen, colorReset)
 		_, _ = fmt.Fprintf(out, "  %s-P, --profile%s <name>   Profile to use (or set %sCLAUDE_PROFILE%s)\n", colorCyan, colorReset, colorYellow, colorReset)
-		_, _ = fmt.Fprintf(out, "  %s--resume-anywhere%s      Skip cwd check when resuming a session\n", colorCyan, colorReset)
+		_, _ = fmt.Fprintf(out, "  %s%s%s      Skip cwd check when resuming a session\n", colorCyan, flagResumeAnywhere, colorReset)
 		_, _ = fmt.Fprintf(out, "  %s-h, --help%s             Show this help\n", colorCyan, colorReset)
 
 		_, _ = fmt.Fprintf(out, "\n%s%s AUTH METHODS%s\n\n", colorBold, colorGreen, colorReset)
