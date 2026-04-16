@@ -39,7 +39,10 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 
 	// Check --resume flag and validate that cwd matches the session's recorded
 	// working directory, unless --resume-anywhere was specified.
-	if resumeID := extractResumeID(claudeArgs); resumeID != "" && !hasResumeAnywhereFlag(rawArgs()) {
+	resumeID := extractResumeID(claudeArgs)
+	resumeAnywhere := hasResumeAnywhereFlag(rawArgs())
+
+	if resumeID != "" && !resumeAnywhere {
 		if err := validateResumeCwd(p, resumeID); err != nil {
 			return err
 		}
