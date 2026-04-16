@@ -83,7 +83,7 @@ func parseSessionMeta(path string) (Session, error) {
 	if err != nil {
 		return Session{}, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	info, err := f.Stat()
 	if err != nil {
