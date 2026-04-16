@@ -138,9 +138,16 @@ func printSessionLine(w io.Writer, s sessions.Session) {
 		branch = fmt.Sprintf("[%s]", s.GitBranch)
 	}
 
-	prompt := s.FirstPrompt
-	if prompt == "" {
-		prompt = "(no prompt)"
+	// Show slug (pretty name) if available, otherwise the first prompt
+	label := s.FirstPrompt
+	if s.Slug != "" {
+		label = s.Slug
+		if s.FirstPrompt != "" {
+			label += fmt.Sprintf(" %s— %s%s", colorDim, s.FirstPrompt, colorReset)
+		}
+	}
+	if label == "" {
+		label = "(no prompt)"
 	}
 
 	_, _ = fmt.Fprintf(w,
@@ -148,7 +155,7 @@ func printSessionLine(w io.Writer, s sessions.Session) {
 		colorAccent, shortID(s.ID), colorReset,
 		colorDim, ts, colorReset,
 		colorGreen, branch, colorReset,
-		prompt,
+		label,
 	)
 }
 

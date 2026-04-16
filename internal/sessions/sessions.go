@@ -20,6 +20,10 @@ type Session struct {
 	// ID is the session UUID (the jsonl filename without extension).
 	ID string
 
+	// Slug is the human-readable session name (e.g. "async-wishing-forest").
+	// Claude generates this and stores it on assistant message records.
+	Slug string
+
 	// Cwd is the working directory recorded on the first user message.
 	Cwd string
 
@@ -62,12 +66,14 @@ func FindByPrefix(configDir, prefix string) ([]Session, error) {
 	return sessions, nil
 }
 
-// userRecord is the minimal JSON structure we need from a "type":"user"
-// line in the session JSONL.
-type userRecord struct {
+// jsonlRecord is the minimal JSON structure we need from lines in the
+// session JSONL. User records have cwd/gitBranch/message; assistant
+// records have the slug (pretty session name).
+type jsonlRecord struct {
 	Type      string      `json:"type"`
 	Cwd       string      `json:"cwd"`
 	GitBranch string      `json:"gitBranch"`
+	Slug      string      `json:"slug"`
 	Message   userMessage `json:"message"`
 }
 
@@ -101,18 +107,32 @@ func parseSessionMeta(path string) (Session, error) {
 	// Session files can have very long lines (tool results, etc.)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
+	foundUser := false
+	foundSlug := false
+
 	for scanner.Scan() {
-		var rec userRecord
+		var rec jsonlRecord
 		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
 			continue
 		}
-		if rec.Type != "user" {
-			continue
+
+		// Extract cwd, branch, and prompt from the first user message
+		if !foundUser && rec.Type == "user" {
+			s.Cwd = rec.Cwd
+			s.GitBranch = rec.GitBranch
+			s.FirstPrompt = extractPromptText(rec.Message.Content)
+			foundUser = true
 		}
-		s.Cwd = rec.Cwd
-		s.GitBranch = rec.GitBranch
-		s.FirstPrompt = extractPromptText(rec.Message.Content)
-		return s, nil
+
+		// Extract the slug (pretty name) — appears on assistant messages
+		if !foundSlug && rec.Slug != "" {
+			s.Slug = rec.Slug
+			foundSlug = true
+		}
+
+		if foundUser && foundSlug {
+			break
+		}
 	}
 
 	return s, nil
