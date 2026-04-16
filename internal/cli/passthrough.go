@@ -129,8 +129,9 @@ func extractClaudeArgs() []string {
 		if len(arg) > len(flagProfileShort) && arg[:len(flagProfileShort)] == flagProfileShort && arg[len(flagProfileShort)] != '-' {
 			continue
 		}
-		// Strip --resume-anywhere (our flag, not claude's)
+		// Replace --resume-anywhere with --resume so claude gets the flag
 		if arg == flagResumeAnywhere {
+			result = append(result, flagResume)
 			continue
 		}
 		result = append(result, arg)

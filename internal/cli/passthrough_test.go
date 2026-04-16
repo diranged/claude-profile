@@ -217,11 +217,12 @@ func TestHasResumeAnywhereFlag(t *testing.T) {
 	assert.False(t, hasResumeAnywhereFlag([]string{}))
 }
 
-func TestExtractClaudeArgs_StripsResumeAnywhere(t *testing.T) {
+func TestExtractClaudeArgs_ReplacesResumeAnywhere(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"claude-profile", "-P", "work", "--resume-anywhere", "--resume", "abc123"}
+	// --resume-anywhere is replaced with --resume so claude gets the flag
+	os.Args = []string{"claude-profile", "-P", "work", "--resume-anywhere", "abc123"}
 	result := extractClaudeArgs()
 	assert.Equal(t, []string{"--resume", "abc123"}, result)
 }
