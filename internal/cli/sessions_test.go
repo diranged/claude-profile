@@ -51,8 +51,8 @@ func TestSessionsCmd_ListsSessions(t *testing.T) {
 	assert.Contains(t, output, "hello from repo b")
 	assert.Contains(t, output, "aaa11111")
 	assert.Contains(t, output, "bbb22222")
-	assert.Contains(t, output, "[main]")
-	assert.Contains(t, output, "[dev]")
+	assert.Contains(t, output, "[branch: main]")
+	assert.Contains(t, output, "[branch: dev]")
 }
 
 func TestSessionsCmd_RepoFilter(t *testing.T) {

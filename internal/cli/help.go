@@ -12,6 +12,7 @@ const (
 	colorReset  = "\033[0m"
 	colorBold   = "\033[1m"
 	colorDim    = "\033[2m"
+	colorItalic = "\033[3m"
 	colorGreen  = "\033[38;5;108m"
 	colorCyan   = "\033[36m"
 	colorYellow = "\033[33m"

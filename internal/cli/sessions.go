@@ -200,50 +200,49 @@ func printSessionGroups(w io.Writer, groups []sessionGroup) {
 //
 // Format:
 //
-//	  <id>  <timestamp>  [<branch>]  <label>
+//	<id>  <timestamp>  [branch: <name>]  [session: <slug>]  : <prompt>
 //
-// Where <label> is the session slug (pretty name) if available, with the
-// first prompt shown dimmed after it. If no slug exists, the first prompt
-// is shown directly. If neither exists, "(no prompt)" is shown.
+// The branch and session name are shown as labeled tags for clarity.
+// When no slug exists, the session tag shows "none" in italic.
 //
 // Example with slug:
 //
-//	  abc12345  2026-04-15 14:30  [main]  async-wishing-forest — fix the flaky test
+//	abc12345  2026-04-15 14:30  [branch: main]  [session: async-wishing-forest]  : fix the flaky test
 //
 // Example without slug:
 //
-//	  abc12345  2026-04-15 14:30  [main]  fix the flaky integration test in auth middleware
+//	abc12345  2026-04-15 14:30  [branch: main]  [session: none]  : fix the flaky test
 func printSessionLine(w io.Writer, s sessions.Session) {
 	ts := s.ModTime.Format("2006-01-02 15:04")
 
-	// Format the git branch as "[branchname]" or empty string if none.
+	// Format the branch tag: "[branch: main]" or empty if no branch recorded.
 	branch := ""
 	if s.GitBranch != "" {
-		branch = fmt.Sprintf("[%s]", s.GitBranch)
+		branch = fmt.Sprintf("[branch: %s]", s.GitBranch)
 	}
 
-	// Build the label: prefer slug with dimmed prompt, fall back to prompt alone.
-	label := s.FirstPrompt
+	// Format the session name tag. When a slug exists, show it; otherwise
+	// show "none" in italic to make it visually obvious this session has
+	// no pretty name.
+	sessionTag := fmt.Sprintf("[session: %s%snone%s]", colorDim, colorItalic, colorReset)
 	if s.Slug != "" {
-		label = s.Slug
-		if s.FirstPrompt != "" {
-			// Show the slug prominently with the first prompt dimmed after "—"
-			// so users can identify the session by name AND topic.
-			label += fmt.Sprintf(" %s— %s%s", colorDim, s.FirstPrompt, colorReset)
-		}
+		sessionTag = fmt.Sprintf("[session: %s%s%s]", colorAccent, s.Slug, colorReset)
 	}
-	if label == "" {
-		label = "(no prompt)"
+
+	// The prompt is always shown after " : " as the final element.
+	prompt := s.FirstPrompt
+	if prompt == "" {
+		prompt = "(no prompt)"
 	}
 
 	// Render the row with fixed-width columns for alignment across sessions.
-	// Column widths: ID=8, timestamp=16, branch=14, label=remainder.
 	_, _ = fmt.Fprintf(w,
-		"  %s%-8s%s  %s%-16s%s  %s%-14s%s  %s\n",
+		"  %s%-8s%s  %s%-16s%s  %s%-20s%s  %s  : %s\n",
 		colorAccent, shortID(s.ID), colorReset,
 		colorDim, ts, colorReset,
 		colorGreen, branch, colorReset,
-		label,
+		sessionTag,
+		prompt,
 	)
 }
 
