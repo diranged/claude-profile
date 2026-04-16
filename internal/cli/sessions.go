@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +11,12 @@ import (
 	"github.com/diranged/claude-profile-go/internal/sessions"
 	"github.com/spf13/cobra"
 )
+
+// sessionGroup holds sessions that share the same working directory.
+type sessionGroup struct {
+	cwd      string
+	sessions []sessions.Session
+}
 
 // newSessionsCmd builds the "sessions" subcommand, which lists all Claude Code
 // sessions across all repos for the active profile.
@@ -40,47 +47,15 @@ Requires a profile to be selected via -P or CLAUDE_PROFILE.`,
 				return fmt.Errorf("invalid --since value %q: %w", sinceFlag, err)
 			}
 
-			cutoff := time.Now().Add(-since)
-
 			allSessions, err := sessions.FindByPrefix(p.ConfigDir, "")
 			if err != nil {
 				return fmt.Errorf("listing sessions: %w", err)
 			}
 
-			// Group by cwd, filter by time and repo
-			type group struct {
-				cwd      string
-				sessions []sessions.Session
-			}
-			var groups []group
-			groupIdx := make(map[string]int)
-
-			for _, s := range allSessions {
-				if s.ModTime.Before(cutoff) {
-					continue
-				}
-				if repoFlag != "" && !containsCI(s.Cwd, repoFlag) {
-					continue
-				}
-
-				cwd := s.Cwd
-				if cwd == "" {
-					cwd = "(unknown)"
-				}
-				if idx, ok := groupIdx[cwd]; ok {
-					groups[idx].sessions = append(groups[idx].sessions, s)
-				} else {
-					groupIdx[cwd] = len(groups)
-					groups = append(groups, group{cwd: cwd, sessions: []sessions.Session{s}})
-				}
-			}
-
-			sort.Slice(groups, func(i, j int) bool {
-				return groups[i].cwd < groups[j].cwd
-			})
+			cutoff := time.Now().Add(-since)
+			groups := groupSessionsByCwd(allSessions, cutoff, repoFlag)
 
 			out := cmd.OutOrStdout()
-
 			if len(groups) == 0 {
 				_, _ = fmt.Fprintf(out, "\n  No sessions found")
 				if sinceFlag != "" {
@@ -90,36 +65,7 @@ Requires a profile to be selected via -P or CLAUDE_PROFILE.`,
 				return nil
 			}
 
-			total := 0
-			for _, g := range groups {
-				total += len(g.sessions)
-			}
-
-			_, _ = fmt.Fprintf(out, "\n%s%s SESSIONS%s", colorBold, colorGreen, colorReset)
-			_, _ = fmt.Fprintf(out, " %s(%d sessions across %d repos)%s\n",
-				colorDim, total, len(groups), colorReset)
-
-			for _, g := range groups {
-				_, _ = fmt.Fprintf(out, "\n%s=== %s ===%s\n", colorCyan, g.cwd, colorReset)
-				for _, s := range g.sessions {
-					ts := s.ModTime.Format("2006-01-02 15:04")
-					branch := ""
-					if s.GitBranch != "" {
-						branch = fmt.Sprintf("[%s]", s.GitBranch)
-					}
-					prompt := s.FirstPrompt
-					if prompt == "" {
-						prompt = "(no prompt)"
-					}
-					_, _ = fmt.Fprintf(out, "  %s%-8s%s  %s%-16s%s  %s%-14s%s  %s\n",
-						colorAccent, shortID(s.ID), colorReset,
-						colorDim, ts, colorReset,
-						colorGreen, branch, colorReset,
-						prompt,
-					)
-				}
-			}
-			_, _ = fmt.Fprintln(out)
+			printSessionGroups(cmd.OutOrStdout(), groups)
 			return nil
 		},
 	}
@@ -128,6 +74,82 @@ Requires a profile to be selected via -P or CLAUDE_PROFILE.`,
 	cmd.Flags().StringVar(&repoFlag, "repo", "", "filter by repo path substring (case-insensitive)")
 
 	return cmd
+}
+
+// groupSessionsByCwd filters sessions by cutoff time and repo substring, then
+// groups them by working directory, sorted alphabetically.
+func groupSessionsByCwd(all []sessions.Session, cutoff time.Time, repoFilter string) []sessionGroup {
+	var groups []sessionGroup
+	groupIdx := make(map[string]int)
+
+	for _, s := range all {
+		if s.ModTime.Before(cutoff) {
+			continue
+		}
+		if repoFilter != "" && !containsCI(s.Cwd, repoFilter) {
+			continue
+		}
+
+		cwd := s.Cwd
+		if cwd == "" {
+			cwd = "(unknown)"
+		}
+
+		if idx, ok := groupIdx[cwd]; ok {
+			groups[idx].sessions = append(groups[idx].sessions, s)
+		} else {
+			groupIdx[cwd] = len(groups)
+			groups = append(groups, sessionGroup{cwd: cwd, sessions: []sessions.Session{s}})
+		}
+	}
+
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].cwd < groups[j].cwd
+	})
+	return groups
+}
+
+// printSessionGroups renders the grouped session list to the given writer.
+func printSessionGroups(w io.Writer, groups []sessionGroup) {
+	total := 0
+	for _, g := range groups {
+		total += len(g.sessions)
+	}
+
+	_, _ = fmt.Fprintf(w, "\n%s%s SESSIONS%s", colorBold, colorGreen, colorReset)
+	_, _ = fmt.Fprintf(w, " %s(%d sessions across %d repos)%s\n",
+		colorDim, total, len(groups), colorReset)
+
+	for _, g := range groups {
+		_, _ = fmt.Fprintf(w, "\n%s=== %s ===%s\n", colorCyan, g.cwd, colorReset)
+		for _, s := range g.sessions {
+			printSessionLine(w, s)
+		}
+	}
+	_, _ = fmt.Fprintln(w)
+}
+
+// printSessionLine renders a single session row.
+func printSessionLine(w io.Writer, s sessions.Session) {
+	ts := s.ModTime.Format("2006-01-02 15:04")
+
+	branch := ""
+	if s.GitBranch != "" {
+		branch = fmt.Sprintf("[%s]", s.GitBranch)
+	}
+
+	prompt := s.FirstPrompt
+	if prompt == "" {
+		prompt = "(no prompt)"
+	}
+
+	_, _ = fmt.Fprintf(w,
+		"  %s%-8s%s  %s%-16s%s  %s%-14s%s  %s\n",
+		colorAccent, shortID(s.ID), colorReset,
+		colorDim, ts, colorReset,
+		colorGreen, branch, colorReset,
+		prompt,
+	)
 }
 
 // parseDuration parses a human-friendly duration string like "7d", "24h", "30m".

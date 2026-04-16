@@ -114,7 +114,7 @@ func extractClaudeArgs() []string {
 			continue
 		}
 		// Skip our own -P/--profile flag and its value
-		if arg == "-P" || arg == "--profile" {
+		if arg == flagProfileShort || arg == flagProfile {
 			// Next arg is the value — skip it too
 			if i+1 < len(args) {
 				skip = true
@@ -122,15 +122,15 @@ func extractClaudeArgs() []string {
 			continue
 		}
 		// Handle --profile=value form
-		if len(arg) > 10 && arg[:10] == "--profile=" {
+		if len(arg) > len(flagProfilePrefix) && arg[:len(flagProfilePrefix)] == flagProfilePrefix {
 			continue
 		}
 		// Handle -P<value> (no space) form
-		if len(arg) > 2 && arg[:2] == "-P" && arg[2] != '-' {
+		if len(arg) > len(flagProfileShort) && arg[:len(flagProfileShort)] == flagProfileShort && arg[len(flagProfileShort)] != '-' {
 			continue
 		}
 		// Strip --resume-anywhere (our flag, not claude's)
-		if arg == "--resume-anywhere" {
+		if arg == flagResumeAnywhere {
 			continue
 		}
 		result = append(result, arg)
@@ -255,20 +255,20 @@ func setEnv(env []string, key, value string) []string {
 func extractResumeID(args []string) string {
 	for i, arg := range args {
 		// --resume <id>
-		if arg == "--resume" && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+		if arg == flagResume && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 			return args[i+1]
 		}
 		// --resume=<id>
-		if strings.HasPrefix(arg, "--resume=") {
-			return arg[len("--resume="):]
+		if strings.HasPrefix(arg, flagResumePrefix) {
+			return arg[len(flagResumePrefix):]
 		}
 		// -r <id>
-		if arg == "-r" && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+		if arg == flagResumeShort && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 			return args[i+1]
 		}
 		// -r<id> (joined form, only if next char is not -)
-		if len(arg) > 2 && arg[:2] == "-r" && arg[2] != '-' {
-			return arg[2:]
+		if len(arg) > len(flagResumeShort) && arg[:len(flagResumeShort)] == flagResumeShort && arg[len(flagResumeShort)] != '-' {
+			return arg[len(flagResumeShort):]
 		}
 	}
 	return ""
@@ -277,7 +277,7 @@ func extractResumeID(args []string) string {
 // hasResumeAnywhereFlag returns true if --resume-anywhere appears in the args.
 func hasResumeAnywhereFlag(args []string) bool {
 	for _, arg := range args {
-		if arg == "--resume-anywhere" {
+		if arg == flagResumeAnywhere {
 			return true
 		}
 	}
@@ -299,16 +299,7 @@ func validateResumeCwd(p *profile.Profile, resumeID string) error {
 	}
 
 	if len(matches) > 1 {
-		msg := fmt.Sprintf("session prefix %q matches multiple sessions:\n", resumeID)
-		for _, s := range matches {
-			branch := ""
-			if s.GitBranch != "" {
-				branch = s.GitBranch
-			}
-			msg += fmt.Sprintf("  %-8s  %-40s  %-10s  %s\n",
-				shortID(s.ID), s.Cwd, branch, s.ModTime.Format("2006-01-02 15:04"))
-		}
-		return fmt.Errorf("%s", msg)
+		return formatAmbiguousResumeError(resumeID, matches)
 	}
 
 	session := matches[0]
@@ -322,37 +313,46 @@ func validateResumeCwd(p *profile.Profile, resumeID string) error {
 		return nil
 	}
 
-	sessionCwd := resolvePath(session.Cwd)
-	currentCwd := resolvePath(cwd)
-
-	if sessionCwd == currentCwd {
+	if resolvePath(session.Cwd) == resolvePath(cwd) {
 		return nil
 	}
 
-	profileName := p.Name
-	branch := ""
-	if session.GitBranch != "" {
-		branch = fmt.Sprintf("\n  Branch:       %s", session.GitBranch)
-	}
-	prompt := ""
-	if session.FirstPrompt != "" {
-		prompt = fmt.Sprintf("\n  First prompt: %s", session.FirstPrompt)
-	}
+	return formatCwdMismatchError(session, cwd, p.Name)
+}
 
-	return fmt.Errorf(
-		"session %s was started in a different directory.\n\n"+
-			"  Session cwd:  %s\n"+
-			"  Current cwd:  %s%s%s\n\n"+
-			"  To resume, cd to the correct directory:\n"+
-			"    cd %s && claude-profile -P %s --resume %s\n\n"+
-			"  Or force-resume from this directory:\n"+
-			"    claude-profile -P %s --resume-anywhere %s",
-		shortID(session.ID),
-		session.Cwd,
-		cwd, branch, prompt,
-		session.Cwd, profileName, shortID(session.ID),
-		profileName, shortID(session.ID),
-	)
+// formatAmbiguousResumeError builds the error shown when a session ID prefix
+// matches more than one session.
+func formatAmbiguousResumeError(prefix string, matches []sessions.Session) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "session prefix %q matches multiple sessions:\n", prefix)
+	for _, s := range matches {
+		fmt.Fprintf(&b, "  %-8s  %-40s  %-10s  %s\n",
+			shortID(s.ID), s.Cwd, s.GitBranch, s.ModTime.Format("2006-01-02 15:04"))
+	}
+	return fmt.Errorf("%s", b.String())
+}
+
+// formatCwdMismatchError builds the error shown when the user tries to resume
+// a session from the wrong directory.
+func formatCwdMismatchError(session sessions.Session, currentCwd, profileName string) error {
+	sid := shortID(session.ID)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "session %s was started in a different directory.\n\n", sid)
+	fmt.Fprintf(&b, "  Session cwd:  %s\n", session.Cwd)
+	fmt.Fprintf(&b, "  Current cwd:  %s\n", currentCwd)
+	if session.GitBranch != "" {
+		fmt.Fprintf(&b, "  Branch:       %s\n", session.GitBranch)
+	}
+	if session.FirstPrompt != "" {
+		fmt.Fprintf(&b, "  First prompt: %s\n", session.FirstPrompt)
+	}
+	fmt.Fprintf(&b, "\n  To resume, cd to the correct directory:\n")
+	fmt.Fprintf(&b, "    cd %s && claude-profile -P %s --resume %s\n", session.Cwd, profileName, sid)
+	fmt.Fprintf(&b, "\n  Or force-resume from this directory:\n")
+	fmt.Fprintf(&b, "    claude-profile -P %s --resume-anywhere %s", profileName, sid)
+
+	return fmt.Errorf("%s", b.String())
 }
 
 // shortID returns the first 8 characters of a session UUID for display.
