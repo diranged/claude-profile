@@ -188,6 +188,122 @@ claude-profile delete old-profile
 claude-profile delete old-profile --force   # Skip confirmation
 ```
 
+### `claude-profile sessions`
+
+Lists all Claude Code sessions across every repository, grouped by directory. This solves a common pain point: when you work across many repos and create sessions frequently, it's hard to remember which repo a particular session lives in.
+
+```bash
+# List sessions from the last 7 days (default)
+$ claude-profile -P me sessions
+
+ SESSIONS (21 sessions across 8 repos)
+
+=== /Users/you/git/myorg/api-service ===
+  abc12345  2026-04-15 14:30  [main]          fix the flaky integration test in auth middleware
+  def67890  2026-04-14 09:15  [feature/oauth] add OAuth2 PKCE flow to the login endpoint
+
+=== /Users/you/git/myorg/frontend ===
+  11122233  2026-04-15 11:00  [main]          why is the bundle size 2MB larger after the last merge?
+
+=== /Users/you/git/personal/blog ===
+  44455566  2026-04-13 20:45  [main]          write a post about Claude Code profiles
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--since` | `7d` | Time window — supports `Nd` (days), `Nh` (hours), `Nm` (minutes) |
+| `--repo` | | Case-insensitive substring filter on the repo path |
+
+```bash
+# Last 30 days
+claude-profile -P me sessions --since 30d
+
+# Only sessions in repos matching "sproutbook"
+claude-profile -P me sessions --repo sproutbook
+
+# Combine filters
+claude-profile -P me sessions --since 14d --repo api
+```
+
+Each line shows:
+- **Session ID** (first 8 characters) — use this with `--resume`
+- **Last modified timestamp**
+- **Git branch** at the time the session was created
+- **First prompt** — truncated to help you identify the session's purpose
+
+### `--resume` Directory Safety Check
+
+When you resume a session with `claude-profile -P <profile> --resume <id>`, claude-profile verifies that your current working directory matches where the session was originally started. This prevents the common mistake of resuming a session from the wrong repo, which leads to Claude operating on the wrong codebase with stale context.
+
+**Wrong directory — you get a helpful error:**
+
+```
+$ pwd
+/Users/you/git/myorg/frontend
+$ claude-profile -P me --resume abc12345
+
+✗ Session abc12345 was started in a different directory.
+
+  Session cwd:  /Users/you/git/myorg/api-service
+  Current cwd:  /Users/you/git/myorg/frontend
+  Branch:       main
+  First prompt: fix the flaky integration test in auth middleware
+
+  To resume, cd to the correct directory:
+    cd /Users/you/git/myorg/api-service && claude-profile -P me --resume abc12345
+
+  Or force-resume from this directory:
+    claude-profile -P me --resume-anywhere abc12345
+```
+
+**Right directory — passes through to Claude normally:**
+
+```
+$ cd /Users/you/git/myorg/api-service
+$ claude-profile -P me --resume abc12345
+╭── Claude Profile v0.2.0 ──────────────────╮
+│ Profile:      me                          │
+│ ...                                       │
+╰───────────────────────────────────────────╯
+```
+
+**Ambiguous session ID prefix:**
+
+```
+$ claude-profile -P me --resume abc
+✗ Session prefix "abc" matches multiple sessions:
+  abc12345  /Users/you/git/myorg/api-service   main  2026-04-15 14:30
+  abc99999  /Users/you/git/personal/blog       main  2026-04-13 20:45
+```
+
+**Bare `--resume` (no ID):**
+
+When you pass `--resume` without a session ID, Claude Code shows its built-in session picker for the current directory. This passes through untouched.
+
+**Override with `--resume-anywhere`:**
+
+If you intentionally want to resume a session from a different directory (e.g., the original directory was deleted or moved), use `--resume-anywhere` to skip the check:
+
+```bash
+claude-profile -P me --resume-anywhere abc12345
+```
+
+#### Typical Workflow
+
+1. **Find your session** — you remember working on something but not which repo:
+   ```bash
+   claude-profile -P me sessions --repo api
+   ```
+
+2. **Spot the session** — `abc12345` with prompt "fix the flaky integration test"
+
+3. **Resume it** — claude-profile tells you if you need to `cd` first:
+   ```bash
+   claude-profile -P me --resume abc12345
+   ```
+
 ### Passthrough Mode (Default)
 
 When no subcommand matches, all arguments are forwarded to the real `claude` binary. This is the primary usage mode -- claude-profile acts as a transparent wrapper.
