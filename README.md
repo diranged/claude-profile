@@ -253,9 +253,6 @@ $ claude-profile -P me --resume abc12345
 
   To resume, cd to the correct directory:
     cd /Users/you/git/myorg/api-service && claude-profile -P me --resume abc12345
-
-  Or force-resume from this directory:
-    claude-profile -P me --resume-anywhere abc12345
 ```
 
 **Right directory — passes through to Claude normally:**
@@ -281,14 +278,6 @@ $ claude-profile -P me --resume abc
 **Bare `--resume` (no ID):**
 
 When you pass `--resume` without a session ID, Claude Code shows its built-in session picker for the current directory. This passes through untouched.
-
-**Override with `--resume-anywhere`:**
-
-If you intentionally want to resume a session from a different directory (e.g., the original directory was deleted or moved), use `--resume-anywhere` to skip the check:
-
-```bash
-claude-profile -P me --resume-anywhere abc12345
-```
 
 #### Typical Workflow
 

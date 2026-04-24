@@ -68,13 +68,3 @@ Type "claude-profile -P work --resume a1b2c3d4"
 Enter
 Sleep 4s
 
-# ---------------------------------------------------------------------------
-# Step 5: Show the --resume-anywhere escape hatch
-# ---------------------------------------------------------------------------
-Type "# To bypass the check, use --resume-anywhere:"
-Enter
-Sleep 500ms
-
-Type "# claude-profile -P work --resume-anywhere a1b2c3d4"
-Enter
-Sleep 3s
