@@ -10,8 +10,8 @@ package cli
 //  1. extractClaudeArgs() — to identify and strip (or replace) flags that
 //     belong to claude-profile before passing the remaining args to claude.
 //
-//  2. extractResumeID() / hasResumeAnywhereFlag() — to detect resume-related
-//     flags in the arg list and extract the session ID.
+//  2. extractResumeID() — to detect resume-related flags in the arg list
+//     and extract the session ID.
 //
 // Note: cobra flag registration in root.go uses bare names ("profile", "P")
 // without the "--"/"-" prefix — those are cobra API conventions, not raw arg
@@ -28,12 +28,6 @@ const (
 	// flagProfilePrefix is the equals-sign form of the profile flag.
 	// Appears as: --profile=<name>
 	flagProfilePrefix = "--profile="
-
-	// flagResumeAnywhere is claude-profile's own flag that tells the resume
-	// cwd check to skip validation. It is replaced with --resume in the
-	// args passed to claude, since claude doesn't know about this flag.
-	// Appears as: --resume-anywhere <id>
-	flagResumeAnywhere = "--resume-anywhere"
 
 	// flagResume is Claude Code's --resume flag, which we intercept to
 	// validate the working directory before passing through.

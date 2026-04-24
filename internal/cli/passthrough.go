@@ -38,11 +38,9 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 	claudeArgs := extractClaudeArgs()
 
 	// Check --resume flag and validate that cwd matches the session's recorded
-	// working directory, unless --resume-anywhere was specified.
+	// working directory.
 	resumeID := extractResumeID(claudeArgs)
-	resumeAnywhere := hasResumeAnywhereFlag(rawArgs())
-
-	if resumeID != "" && !resumeAnywhere {
+	if resumeID != "" {
 		if err := validateResumeCwd(p, resumeID); err != nil {
 			return err
 		}
@@ -127,11 +125,6 @@ func extractClaudeArgs() []string {
 		}
 		// Handle -P<value> (no space) form
 		if len(arg) > len(flagProfileShort) && arg[:len(flagProfileShort)] == flagProfileShort && arg[len(flagProfileShort)] != '-' {
-			continue
-		}
-		// Replace --resume-anywhere with --resume so claude gets the flag
-		if arg == flagResumeAnywhere {
-			result = append(result, flagResume)
 			continue
 		}
 		result = append(result, arg)
@@ -289,19 +282,6 @@ func extractResumeID(args []string) string {
 	return ""
 }
 
-// hasResumeAnywhereFlag scans the raw arg list (before any stripping) for
-// the --resume-anywhere flag. This is checked against rawArgs() (not
-// claudeArgs) because extractClaudeArgs replaces --resume-anywhere with
-// --resume, so it would no longer be visible in the processed arg list.
-func hasResumeAnywhereFlag(args []string) bool {
-	for _, arg := range args {
-		if arg == flagResumeAnywhere {
-			return true
-		}
-	}
-	return false
-}
-
 // validateResumeCwd is the core of the --resume directory safety check.
 // Given a session ID (or prefix), it:
 //
@@ -313,7 +293,7 @@ func hasResumeAnywhereFlag(args []string) bool {
 //  4. If exactly one match: compares the session's recorded cwd with the
 //     current working directory (both resolved through symlinks). If they
 //     match, returns nil. If they differ, returns a formatted error with
-//     the correct cd command and a --resume-anywhere hint.
+//     the correct cd command.
 //
 // The function is intentionally lenient: when in doubt (lookup error, no cwd
 // recorded, can't determine current dir), it passes through rather than
@@ -391,7 +371,6 @@ func formatAmbiguousResumeError(prefix string, matches []sessions.Session) error
 //   - The session's recorded cwd and the user's current cwd
 //   - The git branch and first prompt (if available) for identification
 //   - A copy-pasteable cd + resume command to get to the right place
-//   - A --resume-anywhere command as an escape hatch
 //
 // Example output:
 //
@@ -404,9 +383,6 @@ func formatAmbiguousResumeError(prefix string, matches []sessions.Session) error
 //
 //	  To resume, cd to the correct directory:
 //	    cd /Users/matt/git/myorg/api && claude-profile -P me --resume abc12345
-//
-//	  Or force-resume from this directory:
-//	    claude-profile -P me --resume-anywhere abc12345
 func formatCwdMismatchError(session sessions.Session, currentCwd, profileName string) error {
 	sid := shortID(session.ID)
 
@@ -421,9 +397,7 @@ func formatCwdMismatchError(session sessions.Session, currentCwd, profileName st
 		fmt.Fprintf(&b, "  First prompt: %s\n", session.FirstPrompt)
 	}
 	fmt.Fprintf(&b, "\n  To resume, cd to the correct directory:\n")
-	fmt.Fprintf(&b, "    cd %s && claude-profile -P %s %s %s\n", session.Cwd, profileName, flagResume, sid)
-	fmt.Fprintf(&b, "\n  Or force-resume from this directory:\n")
-	fmt.Fprintf(&b, "    claude-profile -P %s %s %s", profileName, flagResumeAnywhere, sid)
+	fmt.Fprintf(&b, "    cd %s && claude-profile -P %s %s %s", session.Cwd, profileName, flagResume, sid)
 
 	return fmt.Errorf("%s", b.String())
 }

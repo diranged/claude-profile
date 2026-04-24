@@ -43,7 +43,6 @@ Records `sessions.tape` — demonstrates the session management features:
 2. `--repo` filter — narrow to a specific project
 3. Per-profile sessions — show that each profile has its own sessions
 4. `--resume` cwd check — the error when resuming from the wrong directory
-5. `--resume-anywhere` — the escape hatch
 
 Fully automated — no human interaction needed.
 

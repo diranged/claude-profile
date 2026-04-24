@@ -210,23 +210,6 @@ func TestExtractResumeID(t *testing.T) {
 	}
 }
 
-func TestHasResumeAnywhereFlag(t *testing.T) {
-	assert.True(t, hasResumeAnywhereFlag([]string{"--resume-anywhere", "--resume", "abc"}))
-	assert.True(t, hasResumeAnywhereFlag([]string{"--resume", "abc", "--resume-anywhere"}))
-	assert.False(t, hasResumeAnywhereFlag([]string{"--resume", "abc"}))
-	assert.False(t, hasResumeAnywhereFlag([]string{}))
-}
-
-func TestExtractClaudeArgs_ReplacesResumeAnywhere(t *testing.T) {
-	origArgs := os.Args
-	defer func() { os.Args = origArgs }()
-
-	// --resume-anywhere is replaced with --resume so claude gets the flag
-	os.Args = []string{"claude-profile", "-P", "work", "--resume-anywhere", "abc123"}
-	result := extractClaudeArgs()
-	assert.Equal(t, []string{"--resume", "abc123"}, result)
-}
-
 func TestValidateResumeCwd_WrongDirectory(t *testing.T) {
 	initLogger()
 	tmp := t.TempDir()
@@ -246,7 +229,6 @@ func TestValidateResumeCwd_WrongDirectory(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "was started in a different directory")
 	assert.Contains(t, err.Error(), "/some/other/repo")
-	assert.Contains(t, err.Error(), "--resume-anywhere")
 }
 
 func TestValidateResumeCwd_CorrectDirectory(t *testing.T) {
