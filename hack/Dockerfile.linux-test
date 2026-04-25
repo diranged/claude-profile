@@ -1,0 +1,41 @@
+# Linux smoke-test container for claude-profile.
+#
+# Builds claude-profile from the mounted source tree, installs Claude Code, and
+# drops into an interactive shell so you can exercise login/list/show/delete
+# against a real Linux runtime.
+#
+# Usage from repo root:
+#   make docker-test
+# or directly:
+#   docker build -f hack/Dockerfile.linux-test -t claude-profile-linux-test .
+#   docker run --rm -it -v "$PWD":/src claude-profile-linux-test
+
+FROM golang:1.25-bookworm
+
+# Claude Code is distributed via npm. strace is handy for confirming we never
+# invoke `security` on linux during smoke tests.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        nodejs \
+        npm \
+        strace \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @anthropic-ai/claude-code
+
+WORKDIR /src
+
+# Build inside the container against /src, but stash the binary somewhere
+# stable so the entrypoint can find it whether or not /src is a bind mount.
+ENV CGO_ENABLED=0 \
+    GOFLAGS=-buildvcs=false \
+    PATH=/usr/local/bin:/root/.local/bin:/usr/local/go/bin:/go/bin:/usr/bin:/bin
+
+COPY hack/linux-test-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]
