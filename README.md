@@ -2,7 +2,7 @@
 
 **Claude Code... but with Profiles.**
 
-A transparent wrapper around [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that enables multiple subscription profiles. Each profile gets its own isolated config directory and macOS keychain entry, allowing concurrent sessions across different Claude subscriptions (e.g., work and personal).
+A transparent wrapper around [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that enables multiple subscription profiles. Each profile gets its own isolated config directory and credential store -- the macOS Keychain on darwin, or `<config>/.credentials.json` (mode 0600) on Linux -- allowing concurrent sessions across different Claude subscriptions (e.g., work and personal).
 
 <p align="center">
   <img src="docs/demo.gif" alt="Claude Profile Demo" width="800">
@@ -10,11 +10,11 @@ A transparent wrapper around [Claude Code](https://docs.anthropic.com/en/docs/cl
 
 ## How It Works
 
-Claude Profile leverages Claude Code's built-in `CLAUDE_CONFIG_DIR` environment variable. When set, Claude Code automatically hashes the directory path (SHA-256) into its macOS keychain service name, producing a unique credential store per profile. No patching or hacking required -- it uses official, documented behavior.
+Claude Profile leverages Claude Code's built-in `CLAUDE_CONFIG_DIR` environment variable. When set, Claude Code stores credentials in a per-directory location: on macOS it hashes the directory path (SHA-256) into its keychain service name, and on Linux it writes the credentials to `<CLAUDE_CONFIG_DIR>/.credentials.json`. No patching or hacking required -- it uses official, documented behavior.
 
 ```
-Default keychain entry:       "Claude Code-credentials"
-Profile keychain entry:       "Claude Code-credentials-<sha256[:8]>"
+macOS keychain entry:         "Claude Code-credentials-<sha256[:8]>"
+Linux credentials file:       <CLAUDE_CONFIG_DIR>/.credentials.json
 ```
 
 Each profile is a directory under `~/.claude-profiles/<name>/` containing:
