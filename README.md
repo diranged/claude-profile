@@ -159,8 +159,8 @@ $ claude-profile list
 ```
 
 Auth status is one of:
-- **keychain** -- OAuth credentials stored in macOS Keychain
-- **file** -- credentials stored in `.credentials.json` (plaintext fallback)
+- **keychain** -- OAuth credentials stored in the macOS Keychain (darwin only)
+- **file** -- credentials stored in `<config>/.credentials.json` at mode 0600 (default on Linux, fallback on macOS)
 - **none** -- no credentials found
 
 ### `claude-profile show <profile>`
@@ -181,7 +181,7 @@ Scopes:           user:inference, user:read
 
 ### `claude-profile delete <profile>`
 
-Removes a profile's directory and its macOS keychain entry. Prompts for confirmation by default.
+Removes a profile's directory and (on macOS) its keychain entry. Prompts for confirmation by default.
 
 ```bash
 claude-profile delete old-profile
@@ -346,22 +346,24 @@ If an existing statusline command is detected during creation, it is preserved b
 
 ## Credential Isolation
 
-Profile isolation relies on Claude Code's own keychain hashing behavior:
+Profile isolation falls out of Claude Code's per-`CLAUDE_CONFIG_DIR` credential layout. claude-profile sets `CLAUDE_CONFIG_DIR` to `~/.claude-profiles/<name>/config` and Claude Code does the rest:
 
-1. claude-profile sets `CLAUDE_CONFIG_DIR` to `~/.claude-profiles/<name>/config`
-2. Claude Code computes `SHA-256(CLAUDE_CONFIG_DIR)` and takes the first 8 hex characters
-3. The keychain service name becomes `Claude Code-credentials-<hash>`
-4. Each profile gets a completely independent credential store
-
-This matches Claude Code's internal `V51()` function. The hash is deterministic -- the same config directory always produces the same keychain entry.
-
-**Example:**
+**On macOS:** Claude Code computes `SHA-256(CLAUDE_CONFIG_DIR)`, takes the first 8 hex characters, and uses that as the keychain service name (`Claude Code-credentials-<hash>`). This matches Claude Code's internal `V51()` function. The hash is deterministic -- the same config directory always produces the same keychain entry.
 
 ```
 Config dir:  /Users/you/.claude-profiles/work/config
 SHA-256:     6061db4b...
 Keychain:    Claude Code-credentials-6061db4b
 ```
+
+**On Linux:** Claude Code writes credentials to `<CLAUDE_CONFIG_DIR>/.credentials.json` at mode 0600. Each profile has its own config directory, so each profile gets its own credential file -- isolation is automatic.
+
+```
+Config dir:  /home/you/.claude-profiles/work/config
+File:        /home/you/.claude-profiles/work/config/.credentials.json (0600)
+```
+
+Either way, each profile gets a completely independent credential store.
 
 ## Statusline Integration
 
@@ -409,7 +411,7 @@ claude-profile -P work auth login
 # Or inside Claude's REPL: /login
 ```
 
-Credentials are stored in the macOS Keychain under a profile-specific service name.
+On macOS, credentials are stored in the Keychain under a profile-specific service name. On Linux, they're written to `<config>/.credentials.json` at mode 0600.
 
 ### SSO (Enterprise)
 
@@ -423,7 +425,7 @@ claude-profile -P work auth login --sso
 ANTHROPIC_API_KEY=sk-ant-... claude-profile -P work
 ```
 
-No keychain entry is created. The API key is passed through the environment.
+No credential file or keychain entry is created. The API key is passed through the environment.
 
 ### AWS Bedrock
 
@@ -431,7 +433,7 @@ No keychain entry is created. The API key is passed through the environment.
 CLAUDE_CODE_USE_BEDROCK=1 claude-profile -P work
 ```
 
-Credentials come from AWS environment variables or IAM roles. Claude Profile detects this and skips the keychain credential check.
+Credentials come from AWS environment variables or IAM roles. claude-profile passes the env vars through; auth is fully delegated to Claude Code.
 
 ### Google Vertex AI
 
@@ -439,7 +441,7 @@ Credentials come from AWS environment variables or IAM roles. Claude Profile det
 CLAUDE_CODE_USE_VERTEX=1 claude-profile -P work
 ```
 
-Credentials come from GCP environment. Claude Profile detects this and skips the keychain credential check.
+Credentials come from the GCP environment. Same passthrough behavior as Bedrock.
 
 ## Environment Variables Reference
 
@@ -449,9 +451,9 @@ Credentials come from GCP environment. Claude Profile detects this and skips the
 | `CLAUDE_PROFILES_DIR` | Override profiles base directory (default: `~/.claude-profiles`) |
 | `CLAUDE_PROFILE_DEBUG` | Enable debug logging (set to any non-empty value) |
 | `CLAUDE_CONFIG_DIR` | Set automatically by claude-profile per-profile |
-| `CLAUDE_CODE_USE_BEDROCK` | Signals Bedrock auth; skips keychain check |
-| `CLAUDE_CODE_USE_VERTEX` | Signals Vertex auth; skips keychain check |
-| `ANTHROPIC_API_KEY` | Direct API key auth; skips keychain check |
+| `CLAUDE_CODE_USE_BEDROCK` | Signals Bedrock auth (passed through to Claude Code) |
+| `CLAUDE_CODE_USE_VERTEX` | Signals Vertex auth (passed through to Claude Code) |
+| `ANTHROPIC_API_KEY` | Direct API key auth (passed through to Claude Code) |
 | `CLAUDE_PROFILE_NAME` | Set in Claude's env for statusline use |
 | `CLAUDE_PROFILE_AUTH` | Set in Claude's env for statusline use |
 | `CLAUDE_PROFILE_SUB` | Set in Claude's env for statusline use |
