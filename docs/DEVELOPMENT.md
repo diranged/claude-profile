@@ -3,8 +3,9 @@
 ## Prerequisites
 
 - **Go 1.25+** (required by `go.mod`)
-- **macOS** for keychain integration testing (the `security` CLI is macOS-specific)
+- **macOS** if you want to exercise the keychain code paths -- the `security` CLI is darwin-only and gated behind `//go:build darwin`. On Linux the file-based credential path runs instead; nothing else is platform-specific.
 - **Claude Code** installed somewhere in your PATH (for end-to-end testing)
+- **Docker / OrbStack** (optional) for the Linux smoke-test harness via `make docker-test`
 
 ## Building
 
@@ -45,6 +46,21 @@ Key test patterns:
 - `PATH` is manipulated to test binary discovery
 - Keychain tests check both the presence and absence paths
 - The `keychainService()` function has a known-hash test to verify compatibility with Claude Code's `V51()` function
+- darwin-only tests live in `*_darwin_test.go` files and are skipped automatically on Linux
+
+### Linux smoke testing via Docker
+
+`make docker-test` builds a debian-based container with Go and `@anthropic-ai/claude-code` installed, builds claude-profile from your source tree against that container, and drops you into an interactive shell with the binary on `PATH`. Profile state lives at `~/.claude-profiles-linux-test` on the host and persists across runs:
+
+```bash
+make docker-test                            # build image (cached) + run shell
+# inside the container:
+claude-profile list
+claude-profile create work
+strace -f -e execve claude-profile show work 2>&1 | grep security  # confirm we never call `security` on linux
+```
+
+The Dockerfile lives at `hack/Dockerfile.linux-test`.
 
 ## Linting
 
@@ -83,6 +99,8 @@ Formatters: gofmt, goimports.
 │   │   └── *_test.go            CLI tests
 │   ├── profile/                 Profile management
 │   │   ├── profile.go           Core Profile type and operations
+│   │   ├── profile_darwin.go    Keychain helpers (darwin only)
+│   │   ├── profile_other.go    Keychain helper stubs (non-darwin)
 │   │   ├── config.go            YAML config (color settings)
 │   │   ├── bootstrap.go         Config file copying from ~/.claude
 │   │   └── *_test.go            Profile tests
@@ -129,8 +147,9 @@ New operations on profiles should be added as methods on the `*Profile` type in 
 
 ```go
 func (p *Profile) NewOperation() error {
-    // Use p.Dir for profile root, p.ConfigDir for Claude's config dir
-    // Use p.ServiceKey for keychain operations
+    // Use p.Dir for profile root, p.ConfigDir for Claude's config dir.
+    // p.ServiceKey is the macOS keychain service name (only used by darwin code).
+    // Platform-specific I/O should go in profile_darwin.go / profile_other.go.
     return nil
 }
 ```

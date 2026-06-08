@@ -67,6 +67,22 @@ demo: build ## Generate demo GIF using VHS.
 clean: ## Remove build artifacts.
 	rm -rf bin/ dist/ cover.out docs/demo.gif
 
+##@ Linux smoke testing
+
+DOCKER ?= docker
+LINUX_TEST_IMAGE ?= claude-profile-linux-test
+
+.PHONY: docker-test-build
+docker-test-build: ## Build the Linux smoke-test container image.
+	$(DOCKER) build -f hack/Dockerfile.linux-test -t $(LINUX_TEST_IMAGE) .
+
+.PHONY: docker-test
+docker-test: docker-test-build ## Run an interactive shell in a Linux container with claude-profile built and on PATH.
+	$(DOCKER) run --rm -it \
+		-v "$(CURDIR)":/src \
+		-v "$(HOME)/.claude-profiles-linux-test":/root/.claude-profiles \
+		$(LINUX_TEST_IMAGE)
+
 ##@ Dependencies
 
 LOCALBIN ?= $(shell pwd)/bin
