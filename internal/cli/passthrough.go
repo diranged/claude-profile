@@ -31,10 +31,6 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 
 	authStatus := p.AuthStatus()
 
-	// Allow passthrough without credentials when:
-	// - Running an auth command (e.g., "auth login")
-	// - Using Bedrock/Vertex (credentials come from AWS/GCP env, not keychain)
-	// - Using an API key directly
 	claudeArgs := extractClaudeArgs()
 
 	// Check --resume flag and validate that cwd matches the session's recorded
@@ -44,15 +40,6 @@ func runPassthrough(cmd *cobra.Command, _ []string) error {
 		if err := validateResumeCwd(p, resumeID); err != nil {
 			return err
 		}
-	}
-
-	isAuthCmd := len(claudeArgs) > 0 && claudeArgs[0] == "auth"
-	hasExternalAuth := os.Getenv("CLAUDE_CODE_USE_BEDROCK") != "" ||
-		os.Getenv("CLAUDE_CODE_USE_VERTEX") != "" ||
-		os.Getenv("ANTHROPIC_API_KEY") != ""
-
-	if authStatus == "none" && !isAuthCmd && !hasExternalAuth {
-		return fmt.Errorf("profile %q has no credentials. Run: claude-profile -P %s auth login", name, name)
 	}
 
 	claudeBin, err := claude.FindBinary()

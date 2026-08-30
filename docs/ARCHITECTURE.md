@@ -4,30 +4,49 @@ This document describes the internal design of claude-profile.
 
 ## Overview
 
-claude-profile is a thin, transparent wrapper around Claude Code. Its primary job is to set the `CLAUDE_CONFIG_DIR` environment variable before `exec`-ing the real `claude` binary, which causes Claude Code to use an isolated config directory and keychain entry. The wrapper then replaces itself with Claude via `syscall.Exec` -- it does not stay resident as a parent process.
+claude-profile is a thin, transparent wrapper around Claude Code. Its primary job is to set the `CLAUDE_CONFIG_DIR` environment variable before `exec`-ing the real `claude` binary, which causes Claude Code to use an isolated config directory (and on macOS, an isolated keychain entry). The wrapper then replaces itself with Claude via `syscall.Exec` -- it does not stay resident as a parent process.
 
 ## Core Isolation Mechanism: CLAUDE_CONFIG_DIR
 
-Claude Code supports a `CLAUDE_CONFIG_DIR` environment variable that overrides the default `~/.claude` config directory. When this variable is set, Claude Code also changes its macOS keychain service name by appending a SHA-256 hash of the directory path:
+Claude Code supports a `CLAUDE_CONFIG_DIR` environment variable that overrides the default `~/.claude` config directory. When this variable is set, Claude Code derives a per-directory credential location:
+
+- **macOS:** appends a SHA-256 hash of the directory path to its keychain service name.
+- **Linux:** writes credentials to `<CLAUDE_CONFIG_DIR>/.credentials.json` at mode 0600. There is no keychain integration on Linux.
 
 ```
-Default:              "Claude Code-credentials"
-With CLAUDE_CONFIG_DIR: "Claude Code-credentials-<sha256[:8]>"
+macOS keychain service: "Claude Code-credentials-<sha256[:8]>"
+Linux credentials file: <CLAUDE_CONFIG_DIR>/.credentials.json
 ```
 
 The hash uses the first 8 hex characters (4 bytes) of the SHA-256 digest. This behavior is implemented in Claude Code's internal `V51()` function (in `cli.js`).
 
-claude-profile replicates this hash computation in `keychainService()` to:
+On macOS, claude-profile replicates this hash computation in `keychainService()` to:
 - Predict the keychain service name for each profile (for display and cleanup)
 - Verify credential presence without launching Claude
 
-### Hash Example
+On Linux, the corresponding check is just `os.Stat(<config>/.credentials.json)`. Both paths are unified behind `Profile.AuthStatus()`, which returns `"keychain"`, `"file"`, or `"none"`.
+
+### Hash Example (macOS)
 
 ```
 Input:     /Users/you/.claude-profiles/work/config
 SHA-256:   6061db4b...
 Service:   Claude Code-credentials-6061db4b
 ```
+
+### Build-Tag Layout for Keychain Helpers
+
+The macOS `security` CLI is darwin-only, so the keychain helper methods on `*Profile` are split via Go build tags:
+
+```
+internal/profile/
+  profile.go            Cross-platform: AuthStatus, OAuthDetails, Delete (call into helpers).
+  profile_darwin.go     //go:build darwin   -- shells out to `security` for has/read/delete.
+  profile_other.go      //go:build !darwin  -- stubs that return false / nil, forcing the
+                                              .credentials.json fallback path.
+```
+
+This keeps the public `Profile` API platform-agnostic. Adding a Windows backend later would mean a third file, not changes to `profile.go`.
 
 ## Process Lifecycle
 
@@ -39,7 +58,7 @@ The passthrough flow (the primary usage mode) follows this sequence:
 3. resolveProfile():   Returns "work" from flag or CLAUDE_PROFILE env
 4. profile.Load():     Constructs Profile struct with paths and keychain key
 5. Profile.Exists():   Checks config directory exists on disk
-6. AuthStatus():       Checks keychain (via `security` CLI), then .credentials.json
+6. AuthStatus():       Checks keychain via `security` (darwin only), else .credentials.json
 7. extractClaudeArgs():Strips -P/--profile from os.Args, keeps everything else
 8. claude.FindBinary():Locates real claude binary via PATH then fallback paths
 9. claude.BuildEnv():  Copies os.Environ(), sets CLAUDE_CONFIG_DIR
@@ -73,13 +92,15 @@ internal/
     login.go              "create" subcommand: interactive profile wizard.
     list.go               "list" subcommand: enumerate profiles with auth status.
     show.go               "show" subcommand: detailed profile info display.
-    delete.go             "delete" subcommand: remove profile + keychain entry.
+    delete.go             "delete" subcommand: remove profile dir (+ keychain entry on darwin).
     statusline.go         "statusline" subcommand: Claude Code statusline provider.
     args.go               rawArgs() helper for extracting os.Args.
     *_test.go             Unit tests for CLI commands.
 
   profile/
     profile.go            Profile struct, Load/Exists/Delete/List/AuthStatus/OAuthDetails.
+    profile_darwin.go     //go:build darwin   keychain helpers (`security` CLI shell-outs).
+    profile_other.go      //go:build !darwin  keychain helper stubs (force file fallback).
     config.go             Per-profile YAML config (color). Load/Save.
     bootstrap.go          Copy config files from default ~/.claude into new profile.
     *_test.go             Unit tests for profile logic.

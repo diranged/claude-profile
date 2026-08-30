@@ -9,16 +9,18 @@ claude-profile is a thin wrapper that sets an environment variable (`CLAUDE_CONF
 - **Does not** intercept, read, or modify Claude Code's network traffic
 - **Does not** handle authentication tokens directly (except for display via `show`)
 - **Does not** persist any secrets itself
-- **Does** read keychain entries for display purposes only (via the `security` CLI)
+- **Does** read keychain entries (on macOS, via the `security` CLI) or `.credentials.json` (on Linux) for display purposes only
 - **Does** have access to the same filesystem and keychain as the user running it
 
 The security boundary is identical to running Claude Code directly. claude-profile adds no additional network exposure or privilege escalation.
 
 ## Credential Isolation
 
-### macOS Keychain (Primary)
+Where Claude Code stores OAuth credentials depends on the platform.
 
-Claude Code stores OAuth credentials in the macOS Keychain as a generic password entry. The keychain service name is derived from `CLAUDE_CONFIG_DIR`:
+### macOS Keychain (darwin)
+
+On macOS, Claude Code stores credentials in the system Keychain as a generic password entry. The keychain service name is derived from `CLAUDE_CONFIG_DIR`:
 
 ```
 Service: "Claude Code-credentials-<SHA256(CLAUDE_CONFIG_DIR)[:8]>"
@@ -34,28 +36,31 @@ Each profile gets a unique service name because each has a unique config directo
 - Deletion uses `security delete-generic-password`
 - The `security` CLI requires user-level access (no root needed for the login keychain)
 
-### Plaintext Fallback (.credentials.json)
+### Credentials File (Linux, and macOS fallback)
 
-If the keychain is unavailable, Claude Code falls back to storing credentials in a `.credentials.json` file inside the config directory:
+On Linux, Claude Code writes credentials to a JSON file inside the config directory:
 
 ```
 ~/.claude-profiles/<name>/config/.credentials.json
 ```
 
-**Risks:**
-- The file contains OAuth tokens in plaintext JSON
-- File permissions depend on the profile directory creation (`0700` for the config dir, `0644` for files created by Claude Code itself)
-- Any process running as the same user can read this file
-- The file is not encrypted
+The same file path is used on macOS as a fallback if the keychain is unavailable.
 
-**Mitigations:**
-- Profile directories are created with `0700` permissions
-- The `AuthStatus()` method checks keychain first, falling back to file only if needed
-- Users on macOS should ensure keychain integration is working for production use
+**Properties:**
+- The file contains OAuth tokens as plaintext JSON (no application-level encryption)
+- Claude Code writes the file at mode `0600` (user-only read/write)
+- Profile config directories are created with mode `0700` by `EnsureDir()`
+- Filesystem-level encryption (LUKS, FileVault, etc.) is the user's responsibility
+- claude-profile reads but does not modify the file
 
-## Keychain Access via `security` CLI
+**Threats:**
+- Any process running as the same user can read the file
+- A backup/sync tool that ignores file permissions could exfiltrate the token
+- A compromised shell or container with the same UID has full access
 
-claude-profile shells out to the macOS `security` command-line tool for all keychain operations:
+## Keychain Access via `security` CLI (darwin only)
+
+On macOS, claude-profile shells out to the system `security` command-line tool for all keychain operations. On Linux these calls are not made -- the helpers are gated behind `//go:build darwin` and replaced with no-op stubs that fall through to the file path.
 
 ```go
 // Read
@@ -141,7 +146,7 @@ The `security` CLI invocations also use `exec.Command` with explicit argument ar
 | `~/.claude-profiles/<name>/config/` | 0700 | `os.MkdirAll` in `EnsureDir()` |
 | `~/.claude-profiles/<name>/claude-profile.yaml` | 0644 | `os.WriteFile` in `SaveConfig()` |
 | `~/.claude-profiles/<name>/config/settings.json` | 0644 | `os.WriteFile` in `configureStatusline()` |
-| `~/.claude-profiles/<name>/config/.credentials.json` | Varies | Created by Claude Code, not claude-profile |
+| `~/.claude-profiles/<name>/config/.credentials.json` | 0600 (Linux) | Created by Claude Code, not claude-profile |
 
 **Recommendation:** The profiles base directory (`~/.claude-profiles`) should be `0700` to prevent other users from enumerating profiles. Users can set this manually:
 
@@ -151,7 +156,7 @@ chmod 700 ~/.claude-profiles
 
 ## Recommendations
 
-1. **Prefer keychain authentication.** Use OAuth login (`auth login`) rather than API keys or plaintext credential files when possible.
+1. **Prefer OAuth over plaintext API keys.** Use `auth login` (or `/login` from inside the TUI) so credentials land in the macOS Keychain (darwin) or a 0600 `.credentials.json` (Linux). Avoid putting `ANTHROPIC_API_KEY` in shell rc files where it can leak via process environment.
 
 2. **Protect API keys.** If using `ANTHROPIC_API_KEY`, be aware it is visible in the process environment. Consider using a secrets manager or shell integration that sets it only for the current command.
 
@@ -161,14 +166,14 @@ chmod 700 ~/.claude-profiles
 
 5. **Keep Claude Code updated.** claude-profile depends on Claude Code's `CLAUDE_CONFIG_DIR` and keychain hashing behavior. Updates to Claude Code may change these internals.
 
-6. **Use the `show` command to verify isolation.** Run `claude-profile show <name>` to confirm each profile has a distinct keychain service name.
+6. **Use the `show` command to verify isolation.** Run `claude-profile show <name>` to confirm each profile has a distinct credential location -- a unique keychain service name on darwin, or a unique `.credentials.json` path on Linux.
 
 ## Threat Summary
 
 | Threat | Impact | Likelihood | Mitigation |
 |---|---|---|---|
 | Malicious `claude` binary in PATH | Full compromise | Low | Use absolute paths, verify PATH |
-| Plaintext `.credentials.json` read by other process | Token theft | Medium | Use keychain auth, restrict dir perms |
+| Plaintext `.credentials.json` read by other process | Token theft | Medium | On macOS, prefer keychain auth; on Linux, rely on 0600 perms + filesystem-level encryption |
 | API key visible in process environment | Key exposure | Medium | Use OAuth instead, or short-lived keys |
 | Modified `settings.json` statusline command | Arbitrary execution | Low | Restrict file permissions, audit settings |
 | Profile directory enumeration by other users | Privacy leak | Low | `chmod 700 ~/.claude-profiles` |

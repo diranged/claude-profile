@@ -226,11 +226,6 @@ func TestDelete_RemovesDir(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestCurrentUser(t *testing.T) {
-	u := currentUser()
-	assert.NotEmpty(t, u)
-}
-
 func TestSetEnv_NewKey(t *testing.T) {
 	env := []string{"FOO=bar", "BAZ=qux"}
 	env = setEnvHelper(env, "NEW", "val")
